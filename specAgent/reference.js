@@ -16,7 +16,7 @@ self.SpecAgent = self.SpecAgent || function () {
 			order[i] = e.name;
 		});
 	};
-	this.register = function (spec) {
+	Object.defineProperty(this, "register", {value: function (spec) {
 		let foundIndex = specs.indexOf(spec);
 		if (foundIndex != -1) {
 			throw Error("Already registered");
@@ -24,14 +24,20 @@ self.SpecAgent = self.SpecAgent || function () {
 		order[specs.length] = spec.name;
 		specs.push(spec);
 		this[spec.name] = (spec.constructor == Specification) ? new Proxy(spec, {}) : spec;
-	};
-	this.unregister = function (spec) {
+	}});
+	Object.defineProperty(this, "unregister", {value: function (spec) {
 		let foundIndex = specs.indexOf(spec);
 		if (foundIndex == -1) {
 			throw Error("Not registered");
 		};
-		specs
-	};
+		if (order[foundIndex] == spec.name) {
+			delete this[spec.name];
+			order.splice(foundIndex, 1);
+			specs.splice(foundIndex, 1);
+		} else {
+			throw(new Error("Internal error"));
+		};
+	}});
 	Object.defineProperty(this, "length", {
 		get: function () {
 			return order.length;
@@ -42,7 +48,7 @@ self.SpecAgent = self.SpecAgent || function () {
 			return order.slice();
 		}
 	});
-	this.get = function (name) {
+	Object.defineProperty(this, "get", {value: function (name) {
 		let notSuccess = true, loop = 0, result;
 		while (notSuccess) {
 			let currentPos = order.indexOf(name);
@@ -62,5 +68,5 @@ self.SpecAgent = self.SpecAgent || function () {
 			loop ++;
 		};
 		return result;
-	};
+	}});
 };
