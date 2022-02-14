@@ -1,8 +1,9 @@
 "use strict";
 
 {
-	let bzip2 = function (rawData, options = {}) {
+	let bzip2 = new Specification("bzip2");
+	bzip2.decompress = function (rawData, options = {}) {
 		return bz2.decompress(rawData, options.verify || false);
 	};
-	ArchiveProvider.decompress.register(bzip2);
+	ArchiveProvider.register(bzip2);
 };
