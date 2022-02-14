@@ -1,0 +1,14 @@
+#limiter {
+	width: 540px;
+}
+
+.custom-textdial {
+	width: 100%;
+	max-width: 100%;
+	overflow-x: hidden;
+	white-space: nowrap;
+}
+
+.custom-textdial > span {
+	position: relative;
+}
