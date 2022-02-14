@@ -9,6 +9,7 @@ Registers available high-level compression algorithms and their APIs.
 
 ### `DecompressOptions`
 #### `verify`
+Verify data integrity.
 
 ### `CompressOptions`
 #### `memory`
