@@ -84,13 +84,13 @@ self.setMidi = async function (data) {
 	};
 };
 
-fetch("./demo/Sam Sketty - Low Down.mid").then(function (response) {return response.blob()}).then(function (blob) {setMidi({data: blob})});
+fetch("./demo/Sam Sketty - Ambient.mid").then(function (response) {return response.blob()}).then(function (blob) {setMidi({data: blob})});
 
 let textField = $e("#textField");
 let audioPlayer = $e("audio");
 let registerDisp = $e("#register");
 let polyphony = 0;
-let audioDelay = 1.58;
+let audioDelay = 0;
 audioPlayer.onplaying = function () {
 	//textField.innerHTML = "";
 	this.reallyPlaying = true;
@@ -127,7 +127,7 @@ self.task = setInterval(function () {
 							// Switch tempo
 							musicTempo = 60000000 / e.data;
 							musicBInt = e.data / 1000000;
-							textField.innerHTML += `Tempo switched to ${tempo} bpm\n`;
+							textField.innerHTML += `Tempo switched to ${musicTempo} bpm\n`;
 							break;
 						};
 						case 84: {
