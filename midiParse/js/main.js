@@ -94,6 +94,7 @@ audioPlayer.src = "./demo/Sam Sketty - Low Down.opus";
 audioPlayer.onplaying = function () {
 	//textField.innerHTML = "";
 	this.reallyPlaying = true;
+	pressedNotes = [];
 	polyphony = 0, maxPoly = 0;
 	registerDisp.innerHTML = "Empty register";
 	midiEventPool.list.resetPointer(0);
