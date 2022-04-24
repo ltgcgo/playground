@@ -84,17 +84,17 @@ self.setMidi = async function (data) {
 	};
 };
 
-fetch("./demo/Sam Sketty - Ambient.mid").then(function (response) {return response.blob()}).then(function (blob) {setMidi({data: blob})});
+fetch("./demo/Sam Sketty - Low Down.mid").then(function (response) {return response.blob()}).then(function (blob) {setMidi({data: blob})});
 
 let textField = $e("#textField");
 let audioPlayer = $e("audio");
 let registerDisp = $e("#register");
-let polyphony = 0;
-let audioDelay = 0;
+let audioDelay = 1.58;
+audioPlayer.src = "./demo/Sam Sketty - Low Down.opus";
 audioPlayer.onplaying = function () {
 	//textField.innerHTML = "";
 	this.reallyPlaying = true;
-	polyphony = 0;
+	polyphony = 0, maxPoly = 0;
 	registerDisp.innerHTML = "Empty register";
 	midiEventPool.list.resetPointer(0);
 	midiEventPool.list.pointSpan = 0.5;
@@ -104,12 +104,14 @@ audioPlayer.onpause = function () {
 };
 const noteNames = ["C~", "C#", "D~", "Eb", "E~", "F~", "F#", "G~", "Ab", "A~", "Bb", "B~"];
 let musicTempo = 120, musicBInt = 0.5, musicNomin = 2, musicDenom = 4, curBar = 0, curBeat = 0;
+let polyphony = 0, maxPoly = 0;
 self.pressedNotes = [];
 self.task = setInterval(function () {
 	if (self.midiEventPool && audioPlayer.reallyPlaying) {
 		self.midiEvents = midiEventPool.list.at(audioPlayer.currentTime - audioDelay);
 		let totalNotes = Math.floor((audioPlayer.currentTime - audioDelay) / musicBInt);
 		curBar = Math.floor(totalNotes / musicNomin), curBeat = (totalNotes % musicNomin);
+		polyphony = 0;
 		midiEvents.forEach(function (f) {
 			let e = f.data;
 			switch (e.type) {
@@ -140,7 +142,7 @@ self.task = setInterval(function () {
 							break;
 						};
 						default: {
-							textField.innerHTML += `${e.data}\n`;
+							textField.innerHTML += `${e.data || ""}\n`;
 						};
 					};
 					break;
@@ -150,7 +152,6 @@ self.task = setInterval(function () {
 						let foundIndex = pressedNotes[e.meta].indexOf(e.data[0]);
 						pressedNotes[e.meta].splice(foundIndex, 1);
 					};
-					polyphony --;
 					break;
 				};
 				case 9: {
@@ -159,13 +160,11 @@ self.task = setInterval(function () {
 							let foundIndex = pressedNotes[e.meta].indexOf(e.data[0]);
 							pressedNotes[e.meta].splice(foundIndex, 1);
 						};
-						polyphony --;
 					} else {
 						if (!pressedNotes[e.meta]) {
 							pressedNotes[e.meta] = [];
 						};
 						pressedNotes[e.meta].push(e.data[0])
-						polyphony ++;
 					};
 					break;
 				};
@@ -228,7 +227,13 @@ self.task = setInterval(function () {
 				};
 			};
 		});
-		registerDisp.innerHTML = `Events:${midiEvents.length.toString().padStart(3, "0")} Poly:${Math.max(polyphony, 0).toString().padStart(3, "0")}/256 Bar: ${(Math.max(0, curBar) + 1).toString().padStart(3, "0")}/${Math.max(0, curBeat) + 1}:${musicNomin}/${musicDenom}\n\nCH (MSB PRG LSB) M PI PAN : NOTE\n`;
+		pressedNotes.forEach(function (e0) {
+			polyphony += e0.length;
+		});
+		if (maxPoly < polyphony) {
+			maxPoly = polyphony;
+		};
+		registerDisp.innerHTML = `Event:${midiEvents.length.toString().padStart(3, "0")} Poly:${Math.max(polyphony, 0).toString().padStart(3, "0")}/256 Bar:${(Math.max(0, curBar) + 1).toString().padStart(3, "0")}/${Math.max(0, curBeat) + 1} TSig:${musicNomin}/${musicDenom}\nMaxPoly:${Math.max(maxPoly, 0).toString().padStart(3, "0")} Time:${Math.floor(audioPlayer.currentTime).toString().padStart(4,"0")}.${Math.round((audioPlayer.currentTime) % 1 * 1000).toString().padEnd(3,"0")}\n\nCH (MSB PRG LSB) M PI PAN : NOTE\n`;
 		pressedNotes.forEach(function (e0, i) {
 			registerDisp.innerHTML += `${(i+1).toString().padStart(2, "0")} (${(e0.msb || 0).toString().padStart(3, "0")} ${(e0.prg || 0).toString().padStart(3, "0")} ${(e0.lsb || 0).toString().padStart(3, "0")}) ${((e0.mod || 0) >> 4 > 0 ? "~" : "-")} ${textedPitchBend(e0.npb || [0, 64])} ${textedPanning(e0.pan || 64)}: `;
 			Array.from(e0).sort().forEach(function (e1) {
