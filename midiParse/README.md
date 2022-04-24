@@ -1,5 +1,5 @@
 ## MIDI Parse
-Contains several modules: `dataBuilder`, `eventRegister` and `bankMapReader`.
+Contains several modules: `dataBuilder`, `eventRegister`, `bankMapReader` and `canvasDisplay`.
 
 Requires the TimedEvent library in Lightfelt (which is very like to be developed here too).
 
