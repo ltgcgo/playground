@@ -1,6 +1,7 @@
 "use strict";
 
 let midiBlob, midiBuffer, midiJson, msgPort;
+const map = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-";
 
 // Quick paths
 self.$e = function (selector, source) {
@@ -29,8 +30,33 @@ let getBuffer = function (blob) {
 	});
 };
 
+// How much pitch bending?
+let textedPitchBend = function (number) {
+	let normalized = (number[1] % 128 * 128 + number[0]) - 8192;
+	let result = "--";
+	if (normalized > 0) {
+		result = (normalized > 4095) ? ">>" : ">-" ;
+	} else if (normalized < 0) {
+		result = (normalized < -4096) ? "<<" : "-<" ;
+	};
+	return result;
+};
+let textedPanning = function (number) {
+	let normalized = number - 64;
+	let result = Array.from("----");
+	if (normalized > 0) {
+		for (let c = 0; c < Math.ceil(normalized / 16); c ++) {
+			result[c] = ">";
+		};
+	} else if (normalized < 0) {
+		for (let c = 3; c >= (4 + Math.floor(normalized / 16)); c --) {
+			result[c] = "<";
+		};
+	};
+	return result.join("");
+};
+
 {
-	const map = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-";
 	self.randomID = function (length) {
 		let uint8 = new Uint8Array(length);
 		let string = "";
@@ -76,11 +102,14 @@ audioPlayer.onplaying = function () {
 audioPlayer.onpause = function () {
 	this.reallyPlaying = false;
 };
-const noteNames = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"];
+const noteNames = ["C~", "C#", "D~", "Eb", "E~", "F~", "F#", "G~", "Ab", "A~", "Bb", "B~"];
+let musicTempo = 120, musicBInt = 0.5, musicNomin = 2, musicDenom = 4, curBar = 0, curBeat = 0;
 self.pressedNotes = [];
 self.task = setInterval(function () {
 	if (self.midiEventPool && audioPlayer.reallyPlaying) {
 		self.midiEvents = midiEventPool.list.at(audioPlayer.currentTime - audioDelay);
+		let totalNotes = Math.floor((audioPlayer.currentTime - audioDelay) / musicBInt);
+		curBar = Math.floor(totalNotes / musicNomin), curBeat = (totalNotes % musicNomin);
 		midiEvents.forEach(function (f) {
 			let e = f.data;
 			switch (e.type) {
@@ -88,14 +117,16 @@ self.task = setInterval(function () {
 					switch (e.meta) {
 						case 88: {
 							// Time signature
-							let denom = 1 << e.data[1];
+							musicNomin = e.data[0];
+							musicDenom = 1 << e.data[1];
 							let metronomClick = 24 * (32 / e.data[3]) / e.data[2];
-							textField.innerHTML += `Time sig is ${e.data[0]}/${denom}, metronom clicks ${metronomClick} times per full note.\n`;
+							textField.innerHTML += `Time sig is ${e.data[0]}/${musicDenom}, metronom clicks ${metronomClick} times per full note.\n`;
 							break;
 						};
 						case 81: {
 							// Switch tempo
-							let tempo = 60000000 / e.data;
+							musicTempo = 60000000 / e.data;
+							musicBInt = e.data / 1000000;
 							textField.innerHTML += `Tempo switched to ${tempo} bpm\n`;
 							break;
 						};
@@ -115,33 +146,95 @@ self.task = setInterval(function () {
 					break;
 				};
 				case 8: {
-					if (pressedNotes[e.meta] && pressedNotes[e.meta].has(e.data[0])) {
-						pressedNotes[e.meta].delete(e.data[0]);
+					if (pressedNotes[e.meta] && pressedNotes[e.meta].length > 0) {
+						let foundIndex = pressedNotes[e.meta].indexOf(e.data[0]);
+						pressedNotes[e.meta].splice(foundIndex, 1);
 					};
+					polyphony --;
 					break;
 				};
 				case 9: {
-					if (e.data[1] > 31) {
-						if (pressedNotes[e.meta] && pressedNotes[e.meta].has(e.data[0])) {
-							pressedNotes[e.meta].delete(e.data[0]);
+					if (e.data[1] < 3) {
+						if (pressedNotes[e.meta] && pressedNotes[e.meta].length > 0) {
+							let foundIndex = pressedNotes[e.meta].indexOf(e.data[0]);
+							pressedNotes[e.meta].splice(foundIndex, 1);
 						};
+						polyphony --;
 					} else {
 						if (!pressedNotes[e.meta]) {
-							pressedNotes[e.meta] = new Set();
+							pressedNotes[e.meta] = [];
 						};
-						pressedNotes[e.meta].add(e.data[0])
+						pressedNotes[e.meta].push(e.data[0])
+						polyphony ++;
 					};
+					break;
+				};
+				case 11: {
+					if (!pressedNotes[e.meta]) {
+						pressedNotes[e.meta] = [];
+					};
+					switch (e.data[0]) {
+						case 0: {
+							// MSB bank select
+							pressedNotes[e.meta].msb = e.data[1];
+							break;
+						};
+						case 1: {
+							// Modulation
+							pressedNotes[e.meta].mod = e.data[1];
+							break;
+						};
+						case 7: {
+							// Volume
+							pressedNotes[e.meta].vol = e.data[1];
+							break;
+						};
+						case 8: {
+							// Balance
+							pressedNotes[e.meta].bal = e.data[1];
+							break;
+						};
+						case 10: {
+							// Pan
+							pressedNotes[e.meta].pan = e.data[1];
+							break;
+						};
+						case 11: {
+							// Expression
+							pressedNotes[e.meta].exp = e.data[1];
+							break;
+						};
+						case 32: {
+							// LSB bank select
+							pressedNotes[e.meta].lsb = e.data[1];
+							break;
+						};
+					};
+					break;
+				};
+				case 12: {
+					if (!pressedNotes[e.meta]) {
+						pressedNotes[e.meta] = [];
+					};
+					pressedNotes[e.meta].prg = e.data;
+					break;
+				};
+				case 14: {
+					if (!pressedNotes[e.meta]) {
+						pressedNotes[e.meta] = [];
+					};
+					pressedNotes[e.meta].npb = e.data;
 					break;
 				};
 			};
 		});
-		registerDisp.innerHTML = `Events: ${midiEvents.length}, polyphony: ${Math.max(polyphony, 0)}/256, current: ${audioPlayer.currentTime}\n\n`;
+		registerDisp.innerHTML = `Events:${midiEvents.length.toString().padStart(3, "0")} Poly:${Math.max(polyphony, 0).toString().padStart(3, "0")}/256 Bar: ${(Math.max(0, curBar) + 1).toString().padStart(3, "0")}/${Math.max(0, curBeat) + 1}:${musicNomin}/${musicDenom}\n\nCH (MSB PRG LSB) M PI PAN : NOTE\n`;
 		pressedNotes.forEach(function (e0, i) {
-			registerDisp.innerHTML += `CH${i+1}: `;
+			registerDisp.innerHTML += `${(i+1).toString().padStart(2, "0")} (${(e0.msb || 0).toString().padStart(3, "0")} ${(e0.prg || 0).toString().padStart(3, "0")} ${(e0.lsb || 0).toString().padStart(3, "0")}) ${((e0.mod || 0) >> 4 > 0 ? "~" : "-")} ${textedPitchBend(e0.npb || [0, 64])} ${textedPanning(e0.pan || 64)}: `;
 			Array.from(e0).sort().forEach(function (e1) {
 				registerDisp.innerHTML += `${noteNames[e1%12]}${Math.floor(e1/12)} `;
 			});
 			registerDisp.innerHTML += `\n`;
 		});
 	};
-}, 20);
+}, 1000/30);
