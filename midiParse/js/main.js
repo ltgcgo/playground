@@ -1,7 +1,7 @@
 "use strict";
 
 let midiBlob, midiBuffer, midiJson, msgPort;
-const map = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-";
+const map = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_-";
 
 // Quick paths
 self.$e = function (selector, source) {
@@ -100,10 +100,15 @@ audioPlayer.onplaying = function () {
 	midiEventPool.list.resetPointer(0);
 	midiEventPool.list.pointSpan = 0.5;
 };
+audioPlayer.onplay = function () {
+	if (this.ended) {
+		textField.innerHTML = "";
+	};
+};
 audioPlayer.onpause = function () {
 	this.reallyPlaying = false;
 };
-const noteNames = ["C~", "C#", "D~", "Eb", "E~", "F~", "F#", "G~", "Ab", "A~", "Bb", "B~"];
+const noteNames = ["C~", "C#", "D~", "Eb", "E~", "F~", "F#", "G~", "Ab", "A~", "Bb", "B~"], metaType = ["SEQUENCE_NUM", "COMMON_TEXT ", "COPYRIGHT   ", "TRACK_NAME  ", "INSTRUMENT  ", "COMON_LYRICS", "COMON_MARKER", "CM_CUE_POINT"];
 let musicTempo = 120, musicBInt = 0.5, musicNomin = 2, musicDenom = 4, curBar = 0, curBeat = 0;
 let polyphony = 0, maxPoly = 0;
 self.pressedNotes = [];
@@ -143,7 +148,7 @@ self.task = setInterval(function () {
 							break;
 						};
 						default: {
-							textField.innerHTML += `${e.data || ""}\n`;
+							textField.innerHTML += `${metaType[e.meta]}: ${e.data || ""}\n`;
 						};
 					};
 					break;
@@ -209,6 +214,36 @@ self.task = setInterval(function () {
 							pressedNotes[e.meta].lsb = e.data[1];
 							break;
 						};
+						case 70: {
+							// Variation
+							pressedNotes[e.meta].var = e.data[1];
+							break;
+						};
+						case 91: {
+							// Reverb
+							pressedNotes[e.meta].rev = e.data[1];
+							break;
+						};
+						case 92: {
+							// Tremelo
+							pressedNotes[e.meta].tre = e.data[1];
+							break;
+						};
+						case 93: {
+							// Chorus
+							pressedNotes[e.meta].cho = e.data[1];
+							break;
+						};
+						case 94: {
+							// Detune/celeste
+							pressedNotes[e.meta].det = e.data[1];
+							break;
+						};
+						case 95: {
+							// Phaser
+							pressedNotes[e.meta].pha = e.data[1];
+							break;
+						};
 					};
 					break;
 				};
@@ -234,9 +269,9 @@ self.task = setInterval(function () {
 		if (maxPoly < polyphony) {
 			maxPoly = polyphony;
 		};
-		registerDisp.innerHTML = `Event:${midiEvents.length.toString().padStart(3, "0")} Poly:${Math.max(polyphony, 0).toString().padStart(3, "0")}/256 Bar:${(Math.max(0, curBar) + 1).toString().padStart(3, "0")}/${Math.max(0, curBeat) + 1} TSig:${musicNomin}/${musicDenom}\nMaxPoly:${Math.max(maxPoly, 0).toString().padStart(3, "0")} Time:${Math.floor(audioPlayer.currentTime).toString().padStart(4,"0")}.${Math.round((audioPlayer.currentTime) % 1 * 1000).toString().padEnd(3,"0")}\n\nCH (MSB PRG LSB) M PI PAN : NOTE\n`;
+		registerDisp.innerHTML = `Event:${midiEvents.length.toString().padStart(3, "0")} Poly:${Math.max(polyphony, 0).toString().padStart(3, "0")}/256 Bar:${(Math.max(0, curBar) + 1).toString().padStart(3, "0")}/${Math.max(0, curBeat) + 1} TSig:${musicNomin}/${musicDenom}\nMaxPoly:${Math.max(maxPoly, 0).toString().padStart(3, "0")} Time:${Math.floor(audioPlayer.currentTime / 60).toString().padStart(2,"0")}:${Math.floor(audioPlayer.currentTime % 60).toString().padStart(2,"0")}.${Math.round((audioPlayer.currentTime) % 1 * 1000).toString().padStart(3,"0")} Tempo:${Math.floor(musicTempo)}.${Math.round(musicTempo % 1 * 100).toString().padStart(2, "0")}\n\nCH (MSB PRG LSB) BVVEE RCVTD M PI PAN : NOTE\n`;
 		pressedNotes.forEach(function (e0, i) {
-			registerDisp.innerHTML += `${(i+1).toString().padStart(2, "0")} (${(e0.msb || 0).toString().padStart(3, "0")} ${(e0.prg || 0).toString().padStart(3, "0")} ${(e0.lsb || 0).toString().padStart(3, "0")}) ${((e0.mod || 0) >> 4 > 0 ? "~" : "-")} ${textedPitchBend(e0.npb || [0, 64])} ${textedPanning(e0.pan || 64)}: `;
+			registerDisp.innerHTML += `${(i+1).toString().padStart(2, "0")} (${(e0.msb || 0).toString().padStart(3, "0")} ${(e0.prg || 0).toString().padStart(3, "0")} ${(e0.lsb || 0).toString().padStart(3, "0")}) ${map[(e0.bal || 0) >> 3]}${map[(e0.vol || 0) >> 4] + map[(e0.vol || 0) % 16]}${map[(e0.exp || 0) >> 4] + map[(e0.exp || 0) % 16]} ${map[(e0.rev || 0) >> 3]}${map[(e0.cho || 0) >> 3]}${map[(e0.var || 0) >> 3]}${map[(e0.tre || 0) >> 3]}${map[(e0.det || 0) >> 3]} ${((e0.mod || 0) >> 4 > 0 ? "~" : "-")} ${textedPitchBend(e0.npb || [0, 64])} ${textedPanning(e0.pan || 64)}: `;
 			Array.from(e0).sort().forEach(function (e1) {
 				registerDisp.innerHTML += `${noteNames[e1%12]}${Math.floor(e1/12)} `;
 			});
