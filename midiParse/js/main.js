@@ -42,14 +42,15 @@ let textedPitchBend = function (number) {
 	return result;
 };
 let textedPanning = function (number) {
-	let normalized = number - 64;
 	let result = Array.from("----");
-	if (normalized > 0) {
-		for (let c = 0; c < Math.ceil(normalized / 16); c ++) {
+	if (number > 64) {
+		for (let c = 0; number > 64; c ++) {
+			number -= 16;
 			result[c] = ">";
 		};
-	} else if (normalized < 0) {
-		for (let c = 3; c >= (4 + Math.floor(normalized / 16)); c --) {
+	} else if (number < 64) {
+		for (let c = 3; number < 64; c --) {
+			number += 16;
 			result[c] = "<";
 		};
 	};
@@ -84,13 +85,13 @@ self.setMidi = async function (data) {
 	};
 };
 
-fetch("./demo/Sam Sketty - Low Down.mid").then(function (response) {return response.blob()}).then(function (blob) {setMidi({data: blob})});
+fetch("./demo/Sam Sketty - Ambient.mid").then(function (response) {return response.blob()}).then(function (blob) {setMidi({data: blob})});
 
 let textField = $e("#textField");
 let audioPlayer = $e("audio");
 let registerDisp = $e("#register");
-let audioDelay = 1.58;
-audioPlayer.src = "./demo/Sam Sketty - Low Down.opus";
+let audioDelay = 0.976; // 1.58 for Low Down
+audioPlayer.src = "./demo/Sam Sketty - Ambient.opus";
 audioPlayer.onplaying = function () {
 	//textField.innerHTML = "";
 	this.reallyPlaying = true;
@@ -271,7 +272,7 @@ self.task = setInterval(function () {
 		};
 		registerDisp.innerHTML = `Event:${midiEvents.length.toString().padStart(3, "0")} Poly:${Math.max(polyphony, 0).toString().padStart(3, "0")}/256 Bar:${(Math.max(0, curBar) + 1).toString().padStart(3, "0")}/${Math.max(0, curBeat) + 1} TSig:${musicNomin}/${musicDenom}\nMaxPoly:${Math.max(maxPoly, 0).toString().padStart(3, "0")} Time:${Math.floor(audioPlayer.currentTime / 60).toString().padStart(2,"0")}:${Math.floor(audioPlayer.currentTime % 60).toString().padStart(2,"0")}.${Math.round((audioPlayer.currentTime) % 1 * 1000).toString().padStart(3,"0")} Tempo:${Math.floor(musicTempo)}.${Math.round(musicTempo % 1 * 100).toString().padStart(2, "0")}\n\nCH (MSB PRG LSB) BVVEE RCVTD M PI PAN : NOTE\n`;
 		pressedNotes.forEach(function (e0, i) {
-			registerDisp.innerHTML += `${(i+1).toString().padStart(2, "0")} (${(e0.msb || 0).toString().padStart(3, "0")} ${(e0.prg || 0).toString().padStart(3, "0")} ${(e0.lsb || 0).toString().padStart(3, "0")}) ${map[(e0.bal || 0) >> 3]}${map[(e0.vol || 0) >> 4] + map[(e0.vol || 0) % 16]}${map[(e0.exp || 0) >> 4] + map[(e0.exp || 0) % 16]} ${map[(e0.rev || 0) >> 3]}${map[(e0.cho || 0) >> 3]}${map[(e0.var || 0) >> 3]}${map[(e0.tre || 0) >> 3]}${map[(e0.det || 0) >> 3]} ${((e0.mod || 0) >> 4 > 0 ? "~" : "-")} ${textedPitchBend(e0.npb || [0, 64])} ${textedPanning(e0.pan || 64)}: `;
+			registerDisp.innerHTML += `${(i+1).toString().padStart(2, "0")} (${(e0.msb || 0).toString().padStart(3, "0")} ${(e0.prg || 0).toString().padStart(3, "0")} ${(e0.lsb || 0).toString().padStart(3, "0")}) ${map[(e0.bal || 0) >> 3]}${map[(e0.vol || 0) >> 4] + map[(e0.vol || 0) % 16]}${map[(e0.exp || 0) >> 4] + map[(e0.exp || 0) % 16]} ${map[(e0.rev || 0) >> 3]}${map[(e0.cho || 0) >> 3]}${map[(e0.var || 0) >> 3]}${map[(e0.tre || 0) >> 3]}${map[(e0.det || 0) >> 3]} ${((e0.mod || 0) >> 4 > 0 ? "~" : "-")} ${textedPitchBend(e0.npb || [0, 64])} ${textedPanning(e0.pan == undefined ? 0 : e0.pan)}: `;
 			Array.from(e0).sort().forEach(function (e1) {
 				registerDisp.innerHTML += `${noteNames[e1%12]}${Math.floor(e1/12)} `;
 			});
