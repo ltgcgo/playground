@@ -23,6 +23,7 @@ self.MidiEventPool = class {
 		let division = json.timeDivision, tempo = 120, timePointer = 0, lastTimePointer = 0, pointerOffset = 0;
 		let noteTracking = {};
 		json.track.forEach(function (e0, i0) {
+			timePointer = 0, lastTimePointer = 0, pointerOffset = 0;
 			let track = new TimedEventsCollection();
 			track.name = `MIDI Track ${upThis.list.length}`;
 			upThis.list.push(track);

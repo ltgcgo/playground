@@ -85,17 +85,21 @@ self.setMidi = async function (data) {
 	};
 };
 
-fetch("./demo/Sam Sketty - Ambient.mid").then(function (response) {return response.blob()}).then(function (blob) {setMidi({data: blob})});
+fetch("./demo/Sam Sketty - Low Down.mid").then(function (response) {return response.blob()}).then(function (blob) {setMidi({data: blob})});
 
 let textField = $e("#textField");
 let audioPlayer = $e("audio");
 let registerDisp = $e("#register");
-let audioDelay = 0.976; // 1.58 for Low Down
-audioPlayer.src = "./demo/Sam Sketty - Ambient.opus";
+let audioDelay = 0; // 1.58 for Low Down, 0.976 for Ambient
+audioPlayer.src = "./demo/Sam Sketty - Low Down.opus";
 audioPlayer.onplaying = function () {
 	//textField.innerHTML = "";
 	this.reallyPlaying = true;
-	pressedNotes = [];
+	pressedNotes.forEach(function (e) {
+		for (let c = 0; c < e.length; c ++) {
+			e.pop();
+		};
+	});
 	polyphony = 0, maxPoly = 0;
 	registerDisp.innerHTML = "Empty register";
 	midiEventPool.list.resetPointer(0);
@@ -148,13 +152,20 @@ self.task = setInterval(function () {
 							textField.innerHTML += `SMPTE set to ${setFps} FPS, ${setH.toString().padStart(2, "0")}:${setM.toString().padStart(2, "0")}:${setS.toString().padStart(2, "0")}/${setF.toString().padStart(2, "0")}.${setSf.toString().padStart(2, "0")}\n`;
 							break;
 						};
+						case 47: {
+							// End of track
+							textField.innerHTML += `End of current track: ${audioPlayer.currentTime}.\n`;
+							break;
+						};
 						default: {
-							textField.innerHTML += `${metaType[e.meta]}: ${e.data || ""}\n`;
+							let temporalDisplay = e.data || "";
+							textField.innerHTML += `${metaType[e.meta] || e.meta || "Empty meta."}${temporalDisplay ? ":" : "!"} ${temporalDisplay}\n`;
 						};
 					};
 					break;
 				};
 				case 8: {
+					// Note off
 					if (pressedNotes[e.meta] && pressedNotes[e.meta].length > 0) {
 						let foundIndex = pressedNotes[e.meta].indexOf(e.data[0]);
 						pressedNotes[e.meta].splice(foundIndex, 1);
@@ -162,6 +173,7 @@ self.task = setInterval(function () {
 					break;
 				};
 				case 9: {
+					// Note on/state change
 					if (e.data[1] < 3) {
 						if (pressedNotes[e.meta] && pressedNotes[e.meta].length > 0) {
 							let foundIndex = pressedNotes[e.meta].indexOf(e.data[0]);
@@ -173,6 +185,11 @@ self.task = setInterval(function () {
 						};
 						pressedNotes[e.meta].push(e.data[0])
 					};
+					break;
+				};
+				case 10: {
+					// Note aftertouch (state change)
+					console.warn(e);
 					break;
 				};
 				case 11: {
@@ -187,6 +204,16 @@ self.task = setInterval(function () {
 						};
 						case 1: {
 							// Modulation
+							pressedNotes[e.meta].mod = e.data[1];
+							break;
+						};
+						case 2: {
+							// Breath
+							pressedNotes[e.meta].mod = e.data[1];
+							break;
+						};
+						case 4: {
+							// Foot
 							pressedNotes[e.meta].mod = e.data[1];
 							break;
 						};
@@ -220,6 +247,31 @@ self.task = setInterval(function () {
 							pressedNotes[e.meta].var = e.data[1];
 							break;
 						};
+						case 71: {
+							// Harmonic
+							pressedNotes[e.meta].har = e.data[1];
+							break;
+						};
+						case 72: {
+							// Release time
+							pressedNotes[e.meta].rls = e.data[1];
+							break;
+						};
+						case 73: {
+							// Attack time
+							pressedNotes[e.meta].atk = e.data[1];
+							break;
+						};
+						case 74: {
+							// Brightness
+							pressedNotes[e.meta].brt = e.data[1];
+							break;
+						};
+						case 75: {
+							// Decay
+							pressedNotes[e.meta].dcy = e.data[1];
+							break;
+						};
 						case 91: {
 							// Reverb
 							pressedNotes[e.meta].rev = e.data[1];
@@ -245,6 +297,14 @@ self.task = setInterval(function () {
 							pressedNotes[e.meta].pha = e.data[1];
 							break;
 						};
+						case 121: {
+							// Controller reset
+							textField.innerHTML += "Controller has reset.\n";
+							break;
+						};
+						default: {
+							console.warn(JSON.stringify(e));
+						};
 					};
 					break;
 				};
@@ -253,6 +313,11 @@ self.task = setInterval(function () {
 						pressedNotes[e.meta] = [];
 					};
 					pressedNotes[e.meta].prg = e.data;
+					break;
+				};
+				case 13: {
+					// Channel aftertouch (state change)
+					console.warn(e);
 					break;
 				};
 				case 14: {
