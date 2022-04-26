@@ -70,10 +70,17 @@ let textedPanning = function (number) {
 };
 
 self.setMidi = async function (data) {
-	midiBlob = data.data;
+	midiBlob = data;
 	midiBuffer = await getBuffer(midiBlob);
 	midiJson = MidiParser.parse(new Uint8Array(midiBuffer));
 	self.midiEventPool = new MidiEventPool(midiJson);
+};
+self.setAudio = async function (data) {
+	if (self.audioBlob) {
+		URL.revokeObjectURL(audioBlob);
+	};
+	self.audioBlob = data;
+	audioPlayer.src = URL.createObjectURL(audioBlob);
 };
 
 {
@@ -81,11 +88,20 @@ self.setMidi = async function (data) {
 	self.msgId = randomID(16);
 	msgPort = new BroadcastChannel(msgId);
 	msgPort.onmessage = async function (data) {
-		setMidi(data);
+		switch (data.data.type) {
+			case "midi": {
+				setMidi(data.data.blob);
+				break;
+			};
+			case "audio": {
+				setAudio(data.data.blob);
+				break;
+			};
+		};
 	};
 };
 
-fetch("./demo/Sam Sketty - Low Down.mid").then(function (response) {return response.blob()}).then(function (blob) {setMidi({data: blob})});
+fetch("./demo/Sam Sketty - Low Down.mid").then(function (response) {return response.blob()}).then(function (blob) {setMidi(blob)});
 
 let textField = $e("#textField");
 let audioPlayer = $e("audio");
