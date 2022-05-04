@@ -117,6 +117,7 @@ self.setAudio = async function (data) {
 	};
 };
 
+renewBankMap("xg");
 fetch("./demo/Sam Sketty - Low Down.mid").then(function (response) {return response.blob()}).then(function (blob) {setMidi(blob)});
 
 let textField = $e("#textField");

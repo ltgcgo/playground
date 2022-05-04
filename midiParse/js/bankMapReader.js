@@ -14,8 +14,10 @@ self.getSoundBank = function (msb, prg, lsb) {
 	};
 	return bankName.padEnd(9, " ").padStart(10, " ").padEnd(11, " ").padStart(12, " ");
 };
-self.renewBankMap = function () {
-	fetch("./data/bank/xg.tsv").then(function (response) {return response.text()}).then(function (text) {
+self.renewBankMap = function (type) {
+	fetch(`./data/bank/${type}.tsv`).then(function (response) {return response.text()}).then(function (text) {
+		delete self.soundBankInfo;
+		self.soundBankInfo = [];
 		text.split("\n").forEach(function (e) {
 			let assign = e.split("\t"), to = [];
 			assign.forEach(function (e, i) {
@@ -30,5 +32,3 @@ self.renewBankMap = function () {
 		});
 	});
 };
-
-renewBankMap();
