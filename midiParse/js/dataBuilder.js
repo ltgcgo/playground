@@ -1,11 +1,12 @@
 "use strict";
 
-MidiParser.customInterpreter = function (type, buffer) {
-	// THIS DOESN'T WORK PROPERLY!
-	//let u8View = Array.from(new Uint8Array(buffer.buffer));
-	//console.debug(JSON.stringify({type: type, value: buffer}));
-	//console.debug(buffer);
-	return false;
+MidiParser.customInterpreter = function (type, file) {
+	// THIS MAY OR MAY NOT WORK PROPERLY!
+	let metaLength = file.readIntVLV(), u8Data = new Uint8Array(metaLength);
+	for (let c = 0; c < metaLength; c ++) {
+		u8Data[c] = file.readInt(1);
+	};
+	return u8Data;
 };
 
 self.MidiEventPool = class {
@@ -44,6 +45,18 @@ self.MidiEventPool = class {
 					case 10: {
 						// Note aftertouch
 						//addEventToTrack = false;
+						break;
+					};
+					case 11: {
+						// Controller
+						break;
+					};
+					case 12: {
+						// Program change
+						break;
+					};
+					case 14: {
+						// Pitch bend
 						break;
 					};
 					case 15: {

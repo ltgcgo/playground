@@ -19,6 +19,22 @@ self.$a = function (selector, source) {
 	};
 };
 
+// Match array
+let sameArray = function (a, b) {
+	if (a.length != b.length) {
+		return false;	
+	} else {
+		for (let c = 0; c < a.length; c ++) {
+			if (a[c] != b[c]) {
+				return false;
+				break;
+			} else if (c == a.length - 1) {
+				return true;
+			};
+		};
+	};
+};
+
 // Read as array buffer
 let getBuffer = function (blob) {
 	return new Promise(function (proceed, failure) {
@@ -106,6 +122,7 @@ fetch("./demo/Sam Sketty - Low Down.mid").then(function (response) {return respo
 let textField = $e("#textField");
 let audioPlayer = $e("audio");
 let registerDisp = $e("#register");
+let nearestEvent = "";
 let audioDelay = 0; // 1.58 for Low Down, 0.976 for Ambient
 audioPlayer.src = "./demo/Sam Sketty - Low Down.opus";
 audioPlayer.onplaying = function () {
@@ -129,8 +146,14 @@ audioPlayer.onplay = function () {
 audioPlayer.onpause = function () {
 	this.reallyPlaying = false;
 };
-const noteNames = ["C~", "C#", "D~", "Eb", "E~", "F~", "F#", "G~", "Ab", "A~", "Bb", "B~"], metaType = ["SEQUENCE_NUM", "COMMON_TEXT ", "COPYRIGHT   ", "TRACK_NAME  ", "INSTRUMENT  ", "COMON_LYRICS", "COMON_MARKER", "CM_CUE_POINT"];
-let musicTempo = 120, musicBInt = 0.5, musicNomin = 2, musicDenom = 4, curBar = 0, curBeat = 0;
+audioPlayer.onended = function () {	
+	pressedNotes.forEach(function () {
+		pressedNotes.unshift();
+	});
+	nearestEvent = "";
+};
+const noteNames = ["C~", "C#", "D~", "Eb", "E~", "F~", "F#", "G~", "Ab", "A~", "Bb", "B~"], metaType = ["SEQUENCE_NUM", " COMMON_TEXT", "   COPYRIGHT", "  TRACK_NAME", "  INSTRUMENT", "COMON_LYRICS", "COMON_MARKER", "CM_CUE_POINT"];
+let musicTempo = 120, musicBInt = 0.5, musicNomin = 4, musicDenom = 4, curBar = 0, curBeat = 0;
 let polyphony = 0, maxPoly = 0;
 self.pressedNotes = [];
 self.task = setInterval(function () {
@@ -319,7 +342,7 @@ self.task = setInterval(function () {
 							break;
 						};
 						default: {
-							console.warn(JSON.stringify(e));
+							console.debug(JSON.stringify(e));
 						};
 					};
 					break;
@@ -337,11 +360,22 @@ self.task = setInterval(function () {
 					break;
 				};
 				case 14: {
+					// Channel pitch bend
 					if (!pressedNotes[e.meta]) {
 						pressedNotes[e.meta] = [];
 					};
 					pressedNotes[e.meta].npb = e.data;
 					break;
+				};
+				case 15: {
+					if (sameArray(e.data.slice(0, 5), [127, 127, 4, 1, 0])) {
+						pressedNotes.forEach(function (e1) {
+							e1.vol = e.data[5];
+						});
+						nearestEvent = "XG Music Exit";
+					} else {
+						console.warn(audioPlayer.currentTime, e);
+					};
 				};
 			};
 		});
@@ -351,9 +385,9 @@ self.task = setInterval(function () {
 		if (maxPoly < polyphony) {
 			maxPoly = polyphony;
 		};
-		registerDisp.innerHTML = `Event:${midiEvents.length.toString().padStart(3, "0")} Poly:${Math.max(polyphony, 0).toString().padStart(3, "0")}/256 Bar:${(Math.max(0, curBar) + 1).toString().padStart(3, "0")}/${Math.max(0, curBeat) + 1} TSig:${musicNomin}/${musicDenom}\nMaxPoly:${Math.max(maxPoly, 0).toString().padStart(3, "0")} Time:${Math.floor(audioPlayer.currentTime / 60).toString().padStart(2,"0")}:${Math.floor(audioPlayer.currentTime % 60).toString().padStart(2,"0")}.${Math.round((audioPlayer.currentTime) % 1 * 1000).toString().padStart(3,"0")} Tempo:${Math.floor(musicTempo)}.${Math.round(musicTempo % 1 * 100).toString().padStart(2, "0")}\n\nCH (MSB PRG LSB) BVVEE RCVTD M PI PAN : NOTE\n`;
+		registerDisp.innerHTML = `Event:${midiEvents.length.toString().padStart(3, "0")} Poly:${Math.max(polyphony, 0).toString().padStart(3, "0")}/256 Bar:${(Math.max(0, curBar) + 1).toString().padStart(3, "0")}/${Math.max(0, curBeat) + 1} TSig:${musicNomin}/${musicDenom}\nMaxPoly:${Math.max(maxPoly, 0).toString().padStart(3, "0")} Time:${Math.floor(audioPlayer.currentTime / 60).toString().padStart(2,"0")}:${Math.floor(audioPlayer.currentTime % 60).toString().padStart(2,"0")}.${Math.round((audioPlayer.currentTime) % 1 * 1000).toString().padStart(3,"0")} Tempo:${Math.floor(musicTempo)}.${Math.round(musicTempo % 1 * 100).toString().padStart(2, "0")}${nearestEvent ? " Ext:" + nearestEvent : ""}\n\nCH (MSB PRG LSB ) BVVEE RCVTD M PI PAN : NOTE\n`;
 		pressedNotes.forEach(function (e0, i) {
-			registerDisp.innerHTML += `${(i+1).toString().padStart(2, "0")} (${(e0.msb || 0).toString().padStart(3, "0")} ${(e0.prg || 0).toString().padStart(3, "0")} ${(e0.lsb || 0).toString().padStart(3, "0")}) ${map[(e0.bal || 0) >> 3]}${map[(e0.vol || 0) >> 4] + map[(e0.vol || 0) % 16]}${map[(e0.exp || 0) >> 4] + map[(e0.exp || 0) % 16]} ${map[(e0.rev || 0) >> 3]}${map[(e0.cho || 0) >> 3]}${map[(e0.var || 0) >> 3]}${map[(e0.tre || 0) >> 3]}${map[(e0.det || 0) >> 3]} ${((e0.mod || 0) >> 4 > 0 ? "~" : "-")} ${textedPitchBend(e0.npb || [0, 64])} ${textedPanning(e0.pan == undefined ? 0 : e0.pan)}: `;
+			registerDisp.innerHTML += `${(i+1).toString().padStart(2, "0")} (${self.getSoundBank && self.getSoundBank(e0.msb, e0.prg, e0.lsb).padEnd(8, " ") || "Unknown "}) ${map[(e0.bal || 0) >> 3]}${map[(e0.vol || 0) >> 4] + map[(e0.vol || 0) % 16]}${map[(e0.exp || 0) >> 4] + map[(e0.exp || 0) % 16]} ${map[(e0.rev || 0) >> 3]}${map[(e0.cho || 0) >> 3]}${map[(e0.var || 0) >> 3]}${map[(e0.tre || 0) >> 3]}${map[(e0.det || 0) >> 3]} ${((e0.mod || 0) >> 4 > 0 ? "~" : "-")} ${textedPitchBend(e0.npb || [0, 64])} ${textedPanning(e0.pan == undefined ? 0 : e0.pan)}: `;
 			Array.from(e0).sort().forEach(function (e1) {
 				registerDisp.innerHTML += `${noteNames[e1%12]}${Math.floor(e1/12)} `;
 			});
