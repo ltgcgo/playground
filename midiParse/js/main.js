@@ -1,7 +1,7 @@
 "use strict";
 
 let midiBlob, midiBuffer, midiJson, msgPort;
-const map = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_-";
+const map = "0123456789aAbBcCdDeEfFgGhHiIjJkKlLmMnNoOpPqQrRsStTuUvVwWxXyYzZ_-";
 
 // Quick paths
 self.$e = function (selector, source) {
@@ -51,9 +51,11 @@ let textedPitchBend = function (number) {
 	let normalized = (number[1] % 128 * 128 + number[0]) - 8192;
 	let result = "--";
 	if (normalized > 0) {
-		result = (normalized > 4095) ? ">>" : ">-" ;
+		let truncated = normalized >> 11;
+		result = ["=-", ">-", ">=", ">>"][truncated];
 	} else if (normalized < 0) {
-		result = (normalized < -4096) ? "<<" : "-<" ;
+		let inverted = Math.abs(normalized) >> 11;
+		result = ["-=", "-<", "=<", "<<", "<<"][inverted];
 	};
 	return result;
 };
@@ -61,13 +63,13 @@ let textedPanning = function (number) {
 	let result = Array.from("----");
 	if (number > 64) {
 		for (let c = 0; number > 64; c ++) {
+			result[c] = (number < 72) ? "=" : ">";
 			number -= 16;
-			result[c] = ">";
 		};
 	} else if (number < 64) {
 		for (let c = 3; number < 64; c --) {
+			result[c] = (number >= 56) ? "=" : "<";
 			number += 16;
-			result[c] = "<";
 		};
 	};
 	return result.join("");
@@ -118,6 +120,9 @@ self.setAudio = async function (data) {
 };
 
 renewBankMap("xg");
+setInterval(function () {
+	renewBankMap("xg");
+}, 5000);
 fetch("./demo/Sam Sketty - Low Down.mid").then(function (response) {return response.blob()}).then(function (blob) {setMidi(blob)});
 
 let textField = $e("#textField");
@@ -386,9 +391,9 @@ self.task = setInterval(function () {
 		if (maxPoly < polyphony) {
 			maxPoly = polyphony;
 		};
-		registerDisp.innerHTML = `Event:${midiEvents.length.toString().padStart(3, "0")} Poly:${Math.max(polyphony, 0).toString().padStart(3, "0")}/256 Bar:${(Math.max(0, curBar) + 1).toString().padStart(3, "0")}/${Math.max(0, curBeat) + 1} TSig:${musicNomin}/${musicDenom}\nMaxPoly:${Math.max(maxPoly, 0).toString().padStart(3, "0")} Time:${Math.floor(audioPlayer.currentTime / 60).toString().padStart(2,"0")}:${Math.floor(audioPlayer.currentTime % 60).toString().padStart(2,"0")}.${Math.round((audioPlayer.currentTime) % 1 * 1000).toString().padStart(3,"0")} Tempo:${Math.floor(musicTempo)}.${Math.round(musicTempo % 1 * 100).toString().padStart(2, "0")}${nearestEvent ? " Ext:" + nearestEvent : ""}\n\nCH (MSB PRG LSB ) BVVEE RCVTD M PI PAN : NOTE\n`;
+		registerDisp.innerHTML = `Event:${midiEvents.length.toString().padStart(3, "0")} Poly:${Math.max(polyphony, 0).toString().padStart(3, "0")}/256 Bar:${(Math.max(0, curBar) + 1).toString().padStart(3, "0")}/${Math.max(0, curBeat) + 1} TSig:${musicNomin}/${musicDenom}\nMaxPoly:${Math.max(maxPoly, 0).toString().padStart(3, "0")} Time:${Math.floor(audioPlayer.currentTime / 60).toString().padStart(2,"0")}:${Math.floor(audioPlayer.currentTime % 60).toString().padStart(2,"0")}.${Math.round((audioPlayer.currentTime) % 1 * 1000).toString().padStart(3,"0")} Tempo:${Math.floor(musicTempo)}.${Math.round(musicTempo % 1 * 100).toString().padStart(2, "0")}${nearestEvent ? " Ext:" + nearestEvent : ""}\n\nCH (MSB PRG LSB ) BVE RCVTD M PI PAN : NOTE\n`;
 		pressedNotes.forEach(function (e0, i) {
-			registerDisp.innerHTML += `${(i+1).toString().padStart(2, "0")} (${self.getSoundBank && self.getSoundBank(e0.msb, e0.prg, e0.lsb).padEnd(8, " ") || "Unknown "}) ${map[(e0.bal || 0) >> 3]}${map[(e0.vol || 0) >> 4] + map[(e0.vol || 0) % 16]}${map[(e0.exp || 0) >> 4] + map[(e0.exp || 0) % 16]} ${map[(e0.rev || 0) >> 3]}${map[(e0.cho || 0) >> 3]}${map[(e0.var || 0) >> 3]}${map[(e0.tre || 0) >> 3]}${map[(e0.det || 0) >> 3]} ${((e0.mod || 0) >> 4 > 0 ? "~" : "-")} ${textedPitchBend(e0.npb || [0, 64])} ${textedPanning(e0.pan == undefined ? 0 : e0.pan)}: `;
+			registerDisp.innerHTML += `${(i+1).toString().padStart(2, "0")} (${self.getSoundBank && self.getSoundBank(e0.msb, e0.prg, e0.lsb).padEnd(8, " ") || "Unknown "}) ${map[(e0.bal || 0) >> 2]}${map[(e0.vol || 0) >> 2]}${map[(e0.exp || 0) >> 2]} ${map[(e0.rev || 0) >> 2]}${map[(e0.cho || 0) >> 2]}${map[(e0.var || 0) >> 2]}${map[(e0.tre || 0) >> 2]}${map[(e0.det || 0) >> 2]} ${((e0.mod || 0) >> 6 > 0) ? "|" : ((e0.mod || 0) >> 4 > 0 ? "~" : "-")} ${textedPitchBend(e0.npb || [0, 64])} ${textedPanning(e0.pan == undefined ? 0 : e0.pan)}: `;
 			Array.from(e0).sort().forEach(function (e1) {
 				registerDisp.innerHTML += `${noteNames[e1%12]}${Math.floor(e1/12)} `;
 			});
