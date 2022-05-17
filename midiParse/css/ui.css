@@ -1,0 +1,22 @@
+* {
+	cursor: default;
+	color: #ddd;
+	font-size: 20px;
+}
+body {
+	background: #000;
+	min-width: 630px;
+}
+
+pre {
+	margin: 0;
+	font-size: 16px;
+}
+pre#xgLetterDisp {
+	width: max-content;
+	padding: 8px 12px;
+}
+pre#xgLetterDisp.invert {
+	color: #000;
+	background: #ddd;
+}

@@ -46,6 +46,15 @@ let getBuffer = function (blob) {
 	});
 };
 
+// Trailing points
+let trailPt = function (number, integer = 2, float = 2) {
+	let result = "", int = Math.floor(number);
+	result += int.toString().padStart(integer, "0");
+	result += ".";
+	result += Math.floor((number - int) * Math.pow(10, float)).toString().padStart(float, "0");
+	return result;
+};
+
 // How much pitch bending?
 let textedPitchBend = function (number) {
 	let normalized = (number[1] % 128 * 128 + number[0]) - 8192;
@@ -92,6 +101,7 @@ self.setMidi = async function (data) {
 	midiBuffer = await getBuffer(midiBlob);
 	midiJson = MidiParser.parse(new Uint8Array(midiBuffer));
 	self.midiEventPool = new MidiEventPool(midiJson);
+	switchedTrack = true;
 };
 self.setAudio = async function (data) {
 	if (self.audioBlob) {
@@ -126,9 +136,10 @@ setInterval(function () {
 fetch("./demo/Sam Sketty - Low Down.mid").then(function (response) {return response.blob()}).then(function (blob) {setMidi(blob)});
 
 let textField = $e("#textField");
+let xgLetterDisp = $e("#xgLetterDisp");
 let audioPlayer = $e("audio");
 let registerDisp = $e("#register");
-let nearestEvent = "";
+let nearestEvent = "", switchedTrack = false;
 let audioDelay = 0; // 1.58 for Low Down, 0.976 for Ambient
 audioPlayer.src = "./demo/Sam Sketty - Low Down.opus";
 audioPlayer.onplaying = function () {
@@ -139,14 +150,17 @@ audioPlayer.onplaying = function () {
 			e.pop();
 		};
 	});
-	polyphony = 0, maxPoly = 0;
+	polyphony = 0, maxPoly = 0, lastDispTime = -5;
 	registerDisp.innerHTML = "Empty register";
 	midiEventPool.list.resetPointer(0);
 	midiEventPool.list.pointSpan = 0.5;
 };
 audioPlayer.onplay = function () {
-	if (this.ended) {
+	if (this.ended || switchedTrack) {
 		textField.innerHTML = "";
+		delete self.pressedNotes;
+		self.pressedNotes = [];
+		switchedTrack = false;
 	};
 };
 audioPlayer.onpause = function () {
@@ -157,10 +171,26 @@ audioPlayer.onended = function () {
 		pressedNotes.unshift();
 	});
 	nearestEvent = "";
+	switchedTrack = true;
+	midiMode = 0;
 };
-const noteNames = ["C~", "C#", "D~", "Eb", "E~", "F~", "F#", "G~", "Ab", "A~", "Bb", "B~"], metaType = ["SEQUENCE_NUM", " COMMON_TEXT", "   COPYRIGHT", "  TRACK_NAME", "  INSTRUMENT", "COMON_LYRICS", "COMON_MARKER", "CM_CUE_POINT"];
+const noteNames = ["C~", "C#", "D~", "Eb", "E~", "F~", "F#", "G~", "Ab", "A~", "Bb", "B~"]
+const noteShnms = Array.from("CdDeEFgGaAbB");
+const metaType = ["SEQUENCE_NUM", " COMMON_TEXT", "   COPYRIGHT", "  TRACK_NAME", "  INSTRUMENT", "COMON_LYRICS", "COMON_MARKER", "CM_CUE_POINT"];
+const midiModeName = [["??", "GM", "??", "MT", "GS", "XG", "G2"], [
+	"UnkwnStd",
+	"GnrlMIDI",
+	"UnusedId",
+	"RlndMT32",
+	"RolandGS",
+	"YamahaXG",
+	"GenMIDI2"
+]];
+const scales = ["M", "m"];
 let musicTempo = 120, musicBInt = 0.5, musicNomin = 4, musicDenom = 4, curBar = 0, curBeat = 0;
-let polyphony = 0, maxPoly = 0;
+let curKey = 0, curScale = 0;
+let polyphony = 0, altPoly = 0, maxPoly = 0, masterVol = 100;
+let midiMode = 0, lastDispTime = -5;
 self.pressedNotes = [];
 self.task = setInterval(function () {
 	if (self.midiEventPool && audioPlayer.reallyPlaying) {
@@ -178,14 +208,14 @@ self.task = setInterval(function () {
 							musicNomin = e.data[0];
 							musicDenom = 1 << e.data[1];
 							let metronomClick = 24 * (32 / e.data[3]) / e.data[2];
-							textField.innerHTML += `Time sig is ${e.data[0]}/${musicDenom}, metronom clicks ${metronomClick} times per full note.\n`;
+							//textField.innerHTML += `Time sig is ${e.data[0]}/${musicDenom}, metronom clicks ${metronomClick} times per full note.\n`;
 							break;
 						};
 						case 81: {
 							// Switch tempo
 							musicTempo = 60000000 / e.data;
 							musicBInt = e.data / 1000000;
-							textField.innerHTML += `Tempo switched to ${musicTempo} bpm\n`;
+							//textField.innerHTML += `Tempo switched to ${musicTempo} bpm\n`;
 							break;
 						};
 						case 84: {
@@ -197,9 +227,15 @@ self.task = setInterval(function () {
 							textField.innerHTML += `SMPTE set to ${setFps} FPS, ${setH.toString().padStart(2, "0")}:${setM.toString().padStart(2, "0")}:${setS.toString().padStart(2, "0")}/${setF.toString().padStart(2, "0")}.${setSf.toString().padStart(2, "0")}\n`;
 							break;
 						};
+						case 89: {
+							// Key Signature
+							curKey = (e.data[0] + 12) % 12;
+							curScale = e.data[1];
+							break;
+						};
 						case 47: {
 							// End of track
-							textField.innerHTML += `End of current track: ${audioPlayer.currentTime}.\n`;
+							textField.innerHTML += `End of track: ${audioPlayer.currentTime}.\n`;
 							break;
 						};
 						default: {
@@ -214,8 +250,12 @@ self.task = setInterval(function () {
 					if (pressedNotes[e.meta] && pressedNotes[e.meta].length > 0) {
 						let foundIndex = pressedNotes[e.meta].indexOf(e.data[0]);
 						pressedNotes[e.meta].splice(foundIndex, 1);
+						altPoly --;
 					};
 					break;
+					if (maxPoly < Math.max(altPoly, polyphony)) {
+						maxPoly = Math.max(altPoly, polyphony);
+					};
 				};
 				case 9: {
 					// Note on/state change
@@ -223,12 +263,17 @@ self.task = setInterval(function () {
 						if (pressedNotes[e.meta] && pressedNotes[e.meta].length > 0) {
 							let foundIndex = pressedNotes[e.meta].indexOf(e.data[0]);
 							pressedNotes[e.meta].splice(foundIndex, 1);
+							altPoly --;
 						};
 					} else {
 						if (!pressedNotes[e.meta]) {
 							pressedNotes[e.meta] = [];
 						};
-						pressedNotes[e.meta].push(e.data[0])
+						pressedNotes[e.meta].push(e.data[0]);
+						altPoly ++;
+					};
+					if (maxPoly < Math.max(altPoly, polyphony)) {
+						maxPoly = Math.max(altPoly, polyphony);
 					};
 					break;
 				};
@@ -374,13 +419,104 @@ self.task = setInterval(function () {
 					break;
 				};
 				case 15: {
-					if (sameArray(e.data.slice(0, 5), [127, 127, 4, 1, 0])) {
-						pressedNotes.forEach(function (e1) {
-							e1.vol = e.data[5];
-						});
-						nearestEvent = "XG Music Exit";
-					} else {
-						console.warn(audioPlayer.currentTime, e);
+					// MIDI SysEx messages
+					let msg = Array.from(e.data.slice((e.data[0] != 0 ? 1 : 3), e.data.length - 1));
+					switch (e.data[0]) {
+						case 65: {
+							// Roland Corporation
+							switch (msg[0]) {
+								case 16: {
+									if (sameArray(msg.slice(1), [22, 18, 127, 1])) {
+										// MT-32 reset
+										midiMode = 3;
+									} else if (sameArray(msg.slice(1), [66, 18, 64, 0, 127, 0, 65])) {
+										// GS reset
+										midiMode = 4;
+									} else {
+										console.error(audioPlayer.currentTime, msg);
+									};
+									break;
+								};
+								default: {
+									console.error(audioPlayer.currentTime, msg);
+								};
+							};
+							break;
+						};
+						case 66: {
+							// Korg Inc.
+							console.warn(audioPlayer.currentTime, e);
+							break;
+						};
+						case 67: {
+							// Yamaha Corporation
+							switch (msg[0]) {
+								case 16: {
+									if (sameArray(msg.slice(1), [0x4c, 0, 0, 126, 0])) {
+										// XG reset
+										midiMode = 5;
+									} else if (sameArray(msg.slice(1, 4), [76, 6, 0])) {
+										// XG letter display
+										let offset = msg[4], targetText = Array.from("                \n                ");
+										msg.slice(5).forEach(function (e1, i1, a1) {
+											let pointer = i1 + offset;
+											targetText[pointer + Math.floor(pointer / 16)] = String.fromCharCode(e1);
+										});
+										xgLetterDisp.innerHTML = targetText.join("");
+										lastDispTime = audioPlayer.currentTime;
+									} else {
+										console.error(audioPlayer.currentTime, msg);
+									};
+									break;
+								};
+								default: {
+									console.error(audioPlayer.currentTime, msg);
+								};
+							};
+							break;
+						};
+						case 126: {
+							// General MIDI extension
+							switch (msg[0]) {
+								case 127: {
+									if (sameArray(msg.slice(1), [9, 1])) {
+										// General MIDI reset
+										midiMode = 1;
+									} else if (sameArray(msg.slice(2), [9, 3])) {
+										// General MIDI 2 reset
+										midiMode = 6;
+									} else {
+										console.error(audioPlayer.currentTime, msg);
+									};
+									break;
+								};
+								default: {
+									console.error(audioPlayer.currentTime, msg);
+								};
+							};
+							break;
+						};
+						case 127: {
+							// General MIDI extension
+							switch (msg[0]) {
+								case 127: {
+									if (sameArray(msg.slice(1, 3), [4, 1])) {
+										// General MIDI master volume change
+										masterVol = ((msg[4] << 7) + msg[3]) / 163.83;
+									} else {
+										console.error(audioPlayer.currentTime, msg);
+									};
+									break;
+								};
+								default: {
+									console.error(audioPlayer.currentTime, msg);
+								};
+							};
+							break;
+						};
+						default: {
+							console.warn(audioPlayer.currentTime, e);
+						};
 					};
 				};
 			};
@@ -388,10 +524,7 @@ self.task = setInterval(function () {
 		pressedNotes.forEach(function (e0) {
 			polyphony += e0.length;
 		});
-		if (maxPoly < polyphony) {
-			maxPoly = polyphony;
-		};
-		registerDisp.innerHTML = `Event:${midiEvents.length.toString().padStart(3, "0")} Poly:${Math.max(polyphony, 0).toString().padStart(3, "0")}/256 Bar:${(Math.max(0, curBar) + 1).toString().padStart(3, "0")}/${Math.max(0, curBeat) + 1} TSig:${musicNomin}/${musicDenom}\nMaxPoly:${Math.max(maxPoly, 0).toString().padStart(3, "0")} Time:${Math.floor(audioPlayer.currentTime / 60).toString().padStart(2,"0")}:${Math.floor(audioPlayer.currentTime % 60).toString().padStart(2,"0")}.${Math.round((audioPlayer.currentTime) % 1 * 1000).toString().padStart(3,"0")} Tempo:${Math.floor(musicTempo)}.${Math.round(musicTempo % 1 * 100).toString().padStart(2, "0")}${nearestEvent ? " Ext:" + nearestEvent : ""}\n\nCH (MSB PRG LSB ) BVE RCVTD M PI PAN : NOTE\n`;
+		registerDisp.innerHTML = `Event:${midiEvents.length.toString().padStart(3, "0")} Poly:${Math.max(polyphony, 0).toString().padStart(3, "0")}(${Math.max(maxPoly, 0).toString().padStart(3, "0")})/256 Bar:${(Math.max(0, curBar) + 1).toString().padStart(3, "0")}/${Math.max(0, curBeat) + 1} Vol:${trailPt(masterVol, 1, 1)}%\nMode:${midiModeName[1][midiMode]} Time:${Math.floor(audioPlayer.currentTime / 60).toString().padStart(2,"0")}:${Math.floor(audioPlayer.currentTime % 60).toString().padStart(2,"0")}.${Math.round((audioPlayer.currentTime) % 1 * 1000).toString().padStart(3,"0")} TSig:${musicNomin}/${musicDenom} Key:${noteShnms[curKey]}${scales[curScale]} Tempo:${trailPt(musicTempo)}${nearestEvent ? " Ext:" + nearestEvent : ""}\n\nCH (MSB PRG LSB ) BVE RCVTD M PI PAN : NOTE\n`;
 		pressedNotes.forEach(function (e0, i) {
 			registerDisp.innerHTML += `${(i+1).toString().padStart(2, "0")} (${self.getSoundBank && self.getSoundBank(e0.msb, e0.prg, e0.lsb).padEnd(8, " ") || "Unknown "}) ${map[(e0.bal || 0) >> 2]}${map[(e0.vol || 0) >> 2]}${map[(e0.exp || 0) >> 2]} ${map[(e0.rev || 0) >> 2]}${map[(e0.cho || 0) >> 2]}${map[(e0.var || 0) >> 2]}${map[(e0.tre || 0) >> 2]}${map[(e0.det || 0) >> 2]} ${((e0.mod || 0) >> 6 > 0) ? "|" : ((e0.mod || 0) >> 4 > 0 ? "~" : "-")} ${textedPitchBend(e0.npb || [0, 64])} ${textedPanning(e0.pan == undefined ? 0 : e0.pan)}: `;
 			Array.from(e0).sort().forEach(function (e1) {
@@ -399,5 +532,12 @@ self.task = setInterval(function () {
 			});
 			registerDisp.innerHTML += `\n`;
 		});
+		if (Math.abs(lastDispTime - audioPlayer.currentTime) < 5) {
+			// Highlight the letter display
+			xgLetterDisp.className = "invert";
+		} else {
+			// Return it to normal
+			xgLetterDisp.className = "";
+		};
 	};
 }, 1000/30);
