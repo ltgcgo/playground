@@ -536,7 +536,7 @@ self.task = setInterval(function () {
 			});
 			registerDisp.innerHTML += `\n`;
 		});
-		if (Math.abs(lastDispTime - audioPlayer.currentTime) < 5) {
+		if (Math.abs(lastDispTime - audioPlayer.currentTime) < 3.2767) {
 			// Highlight the letter display
 			xgLetterDisp.className = "invert";
 		} else {
