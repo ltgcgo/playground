@@ -5,7 +5,7 @@ self.getSoundBank = function (msb, prg, lsb) {
 	let bankName = (msb || 0).toString().padStart(3, "0") + " " + (prg || 0).toString().padStart(3, "0") + " " + (lsb || 0).toString().padStart(3, "0") + " ";
 	let to = soundBankInfo;
 	for (let c = 0; c < 3; c ++) {
-		to = to[arguments[c]];
+		to = to[arguments[c] || 0];
 		if (!to) {
 			break;
 		} else if (c == 2) {

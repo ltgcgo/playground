@@ -229,13 +229,17 @@ self.task = setInterval(function () {
 						};
 						case 89: {
 							// Key Signature
-							curKey = (e.data[0] + 12) % 12;
-							curScale = e.data[1];
+							curKey = (e.data[0] + 12) % 12 || 0;
+							curScale = e.data[1] || 0;
+							break;
+						};
+						case 33: {
+							// I don't know what it does, really. Just that the Monkey Island MIDI file appeared this.
 							break;
 						};
 						case 47: {
 							// End of track
-							textField.innerHTML += `End of track: ${audioPlayer.currentTime}.\n`;
+							//textField.innerHTML += `End of track: ${audioPlayer.currentTime}.\n`;
 							break;
 						};
 						default: {
