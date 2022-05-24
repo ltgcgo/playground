@@ -1,7 +1,7 @@
 "use strict";
 
 let midiBlob, midiBuffer, midiJson, msgPort;
-const map = "0123456789aAbBcCdDeEfFgGhHiIjJkKlLmMnNoOpPqQrRsStTuUvVwWxXyYzZ_-";
+const map = "0123456789_aAbBcCdDeEfFgGhHiIjJ-kKlLmMnNoOpPqQrRsStTuUvVwWxXyYzZ";
 
 // Quick paths
 self.$e = function (selector, source) {
@@ -161,6 +161,7 @@ audioPlayer.onplay = function () {
 		delete self.pressedNotes;
 		self.pressedNotes = [];
 		switchedTrack = false;
+		barOffsetNotes = 0;
 	};
 };
 audioPlayer.onpause = function () {
@@ -173,6 +174,7 @@ audioPlayer.onended = function () {
 	nearestEvent = "";
 	switchedTrack = true;
 	midiMode = 0;
+	barOffsetNotes = 0;
 };
 const noteNames = ["C~", "C#", "D~", "Eb", "E~", "F~", "F#", "G~", "Ab", "A~", "Bb", "B~"]
 const noteShnms = Array.from("CdDeEFgGaAbB");
@@ -187,16 +189,16 @@ const midiModeName = [["??", "GM", "??", "MT", "GS", "XG", "G2"], [
 	"GenMIDI2"
 ]];
 const scales = ["M", "m"];
-let musicTempo = 120, musicBInt = 0.5, musicNomin = 4, musicDenom = 4, curBar = 0, curBeat = 0;
+let musicTempo = 120, musicBInt = 0.5, musicNomin = 4, musicDenom = 4, curBar = 0, curBeat = 0, curBeatFloat = 0;
 let curKey = 0, curScale = 0;
 let polyphony = 0, altPoly = 0, maxPoly = 0, masterVol = 100;
-let midiMode = 0, lastDispTime = -5;
+let midiMode = 0, lastDispTime = -5, barOffsetNotes = 0;
 self.pressedNotes = [];
 self.task = setInterval(function () {
 	if (self.midiEventPool && audioPlayer.reallyPlaying) {
 		self.midiEvents = midiEventPool.list.at(audioPlayer.currentTime - audioDelay);
-		let totalNotes = Math.floor((audioPlayer.currentTime - audioDelay) / musicBInt);
-		curBar = Math.floor(totalNotes / musicNomin), curBeat = (totalNotes % musicNomin);
+		let progressNotes = (audioPlayer.currentTime - audioDelay) / musicBInt, totalNotes = progressNotes - barOffsetNotes;
+		curBar = Math.floor(totalNotes / musicNomin), curBeat = Math.floor(totalNotes % musicNomin);
 		polyphony = 0;
 		midiEvents.forEach(function (f) {
 			let e = f.data;
@@ -213,8 +215,10 @@ self.task = setInterval(function () {
 						};
 						case 81: {
 							// Switch tempo
+							let lastBint = musicBInt || 120;
 							musicTempo = 60000000 / e.data;
 							musicBInt = e.data / 1000000;
+							barOffsetNotes += progressNotes * lastBint / musicBInt - progressNotes;
 							//textField.innerHTML += `Tempo switched to ${musicTempo} bpm\n`;
 							break;
 						};
@@ -224,7 +228,7 @@ self.task = setInterval(function () {
 							let setFps = [24, 25, 29.97, 30][(hourByte >> 7 << 2) ^ (hourByte >> 5)];
 							let setH = (hourByte >> 5 << 5) ^ hourByte;
 							let setM = e.data[1], setS = e.data[2], setF = e.data[3], setSf = e.data[4];
-							textField.innerHTML += `SMPTE set to ${setFps} FPS, ${setH.toString().padStart(2, "0")}:${setM.toString().padStart(2, "0")}:${setS.toString().padStart(2, "0")}/${setF.toString().padStart(2, "0")}.${setSf.toString().padStart(2, "0")}\n`;
+							//textField.innerHTML += `SMPTE set to ${setFps} FPS, ${setH.toString().padStart(2, "0")}:${setM.toString().padStart(2, "0")}:${setS.toString().padStart(2, "0")}/${setF.toString().padStart(2, "0")}.${setSf.toString().padStart(2, "0")}\n`;
 							break;
 						};
 						case 89: {
@@ -272,6 +276,11 @@ self.task = setInterval(function () {
 					} else {
 						if (!pressedNotes[e.meta]) {
 							pressedNotes[e.meta] = [];
+							pressedNotes[e.meta].vol = 100;
+							pressedNotes[e.meta].exp = 127;
+							if (e.meta == 9) {
+								pressedNotes[e.meta].msb = 127;
+							};
 						};
 						pressedNotes[e.meta].push(e.data[0]);
 						altPoly ++;
@@ -289,11 +298,18 @@ self.task = setInterval(function () {
 				case 11: {
 					if (!pressedNotes[e.meta]) {
 						pressedNotes[e.meta] = [];
+						pressedNotes[e.meta].vol = 100;
+						pressedNotes[e.meta].exp = 127;
+						if (e.meta == 9) {
+							pressedNotes[e.meta].msb = 127;
+						};
 					};
 					switch (e.data[0]) {
 						case 0: {
 							// MSB bank select
-							pressedNotes[e.meta].msb = e.data[1];
+							if (midiMode) {
+								pressedNotes[e.meta].msb = e.data[1];
+							};
 							break;
 						};
 						case 1: {
@@ -303,12 +319,12 @@ self.task = setInterval(function () {
 						};
 						case 2: {
 							// Breath
-							pressedNotes[e.meta].mod = e.data[1];
+							pressedNotes[e.meta].brt = e.data[1];
 							break;
 						};
 						case 4: {
 							// Foot
-							pressedNotes[e.meta].mod = e.data[1];
+							pressedNotes[e.meta].fot = e.data[1];
 							break;
 						};
 						case 7: {
@@ -333,7 +349,9 @@ self.task = setInterval(function () {
 						};
 						case 32: {
 							// LSB bank select
-							pressedNotes[e.meta].lsb = e.data[1];
+							if (midiMode) {
+								pressedNotes[e.meta].lsb = e.data[1];
+							};
 							break;
 						};
 						case 70: {
@@ -393,7 +411,10 @@ self.task = setInterval(function () {
 						};
 						case 121: {
 							// Controller reset
-							textField.innerHTML += "Controller has reset.\n";
+							//textField.innerHTML += "Controller has reset.\n";
+							if (!midiMode) {
+								midiMode = 1;
+							};
 							break;
 						};
 						default: {
@@ -405,6 +426,11 @@ self.task = setInterval(function () {
 				case 12: {
 					if (!pressedNotes[e.meta]) {
 						pressedNotes[e.meta] = [];
+						pressedNotes[e.meta].vol = 100;
+						pressedNotes[e.meta].exp = 127;
+						if (e.meta == 9) {
+							pressedNotes[e.meta].msb = 127;
+						};
 					};
 					pressedNotes[e.meta].prg = e.data;
 					break;
@@ -528,9 +554,9 @@ self.task = setInterval(function () {
 		pressedNotes.forEach(function (e0) {
 			polyphony += e0.length;
 		});
-		registerDisp.innerHTML = `Event:${midiEvents.length.toString().padStart(3, "0")} Poly:${Math.max(polyphony, 0).toString().padStart(3, "0")}(${Math.max(maxPoly, 0).toString().padStart(3, "0")})/256 Bar:${(Math.max(0, curBar) + 1).toString().padStart(3, "0")}/${Math.max(0, curBeat) + 1} Vol:${trailPt(masterVol, 1, 1)}%\nMode:${midiModeName[1][midiMode]} Time:${Math.floor(audioPlayer.currentTime / 60).toString().padStart(2,"0")}:${Math.floor(audioPlayer.currentTime % 60).toString().padStart(2,"0")}.${Math.round((audioPlayer.currentTime) % 1 * 1000).toString().padStart(3,"0")} TSig:${musicNomin}/${musicDenom} Key:${noteShnms[curKey]}${scales[curScale]} Tempo:${trailPt(musicTempo)}${nearestEvent ? " Ext:" + nearestEvent : ""}\n\nCH (MSB PRG LSB ) BVE RCVTD M PI PAN : NOTE\n`;
+		registerDisp.innerHTML = `Event:${midiEvents.length.toString().padStart(3, "0")} Poly:${Math.max(polyphony, 0).toString().padStart(3, "0")}(${Math.max(maxPoly, 0).toString().padStart(3, "0")})/256 Bar:${(Math.max(0, curBar) + 1).toString().padStart(3, "0")}/${Math.max(0, curBeat) + 1} Vol:${trailPt(masterVol, 1, 1)}%\nMode:${midiModeName[1][midiMode]} Time:${Math.floor(audioPlayer.currentTime / 60).toString().padStart(2,"0")}:${Math.floor(audioPlayer.currentTime % 60).toString().padStart(2,"0")}.${Math.round((audioPlayer.currentTime) % 1 * 1000).toString().padStart(3,"0")} TSig:${musicNomin}/${musicDenom} Key:${noteShnms[curKey]}${scales[curScale]} Tempo:${trailPt(Math.round(musicTempo * 100) / 100)}${nearestEvent ? " Ext:" + nearestEvent : ""}\n\nCH:Ch.Voice BVE RCVTD M PI PAN : NOTE\n`;
 		pressedNotes.forEach(function (e0, i) {
-			registerDisp.innerHTML += `${(i+1).toString().padStart(2, "0")} (${self.getSoundBank && self.getSoundBank(e0.msb, e0.prg, e0.lsb).padEnd(8, " ") || "Unknown "}) ${map[(e0.bal || 0) >> 2]}${map[(e0.vol || 0) >> 2]}${map[(e0.exp || 0) >> 2]} ${map[(e0.rev || 0) >> 2]}${map[(e0.cho || 0) >> 2]}${map[(e0.var || 0) >> 2]}${map[(e0.tre || 0) >> 2]}${map[(e0.det || 0) >> 2]} ${((e0.mod || 0) >> 6 > 0) ? "|" : ((e0.mod || 0) >> 4 > 0 ? "~" : "-")} ${textedPitchBend(e0.npb || [0, 64])} ${textedPanning(e0.pan == undefined ? 0 : e0.pan)}: `;
+			registerDisp.innerHTML += `${(i+1).toString().padStart(2, "0")}:${self.getSoundBank && self.getSoundBank(e0.msb, e0.prg, e0.lsb).padEnd(8, " ") || "Unknown "} ${map[(e0.bal || 0) >> 1]}${map[(e0.vol || 0) >> 1]}${map[(e0.exp || 0) >> 1]} ${map[(e0.rev || 0) >> 1]}${map[(e0.cho || 0) >> 1]}${map[(e0.var || 0) >> 1]}${map[(e0.tre || 0) >> 1]}${map[(e0.det || 0) >> 1]} ${((e0.mod || 0) >> 6 > 0) ? "|" : ((e0.mod || 0) >> 4 > 0 ? "~" : "-")} ${textedPitchBend(e0.npb || [0, 64])} ${textedPanning(e0.pan == undefined ? 0 : e0.pan)}: `;
 			Array.from(e0).sort().forEach(function (e1) {
 				registerDisp.innerHTML += `${noteNames[e1%12]}${Math.floor(e1/12)} `;
 			});

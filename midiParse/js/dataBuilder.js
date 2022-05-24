@@ -2,7 +2,11 @@
 
 MidiParser.customInterpreter = function (type, file) {
 	// THIS MAY OR MAY NOT WORK PROPERLY!
-	let metaLength = file.readIntVLV(), u8Data = new Uint8Array(metaLength);
+	let metaLength = file.readIntVLV();
+	if (type == 127) {
+		metaLength = 1;
+	};
+	let u8Data = new Uint8Array(metaLength);
 	for (let c = 0; c < metaLength; c ++) {
 		u8Data[c] = file.readInt(1);
 	};
@@ -22,7 +26,9 @@ self.MidiEventPool = class {
 		let upThis = this;
 		// MIDI time division
 		let division = json.timeDivision, tempo = 120, timePointer = 0, lastTimePointer = 0, pointerOffset = 0;
-		let noteTracking = {};
+		let noteTracking = {}, tempoChanges = new TimedEvents();
+		tempoChanges.push(new RangeEvent(0, 281474976710655, [120, 0]));
+		tempoChanges.pointSpan = 1;
 		json.track.forEach(function (e0, i0) {
 			timePointer = 0, lastTimePointer = 0, pointerOffset = 0;
 			let track = new TimedEventsCollection();
@@ -31,6 +37,13 @@ self.MidiEventPool = class {
 			e0.event.forEach(function (e1, i1) {
 				let addEventToTrack = true;
 				timePointer += e1.deltaTime;
+				// Should the current event apply a new tempo and pointerOffset?
+				let changeData = tempoChanges.at(timePointer)[0];
+				if (changeData) {
+					tempo = changeData.data[0];
+					pointerOffset = changeData.data[1];
+				};
+				// Event parsing
 				switch (e1.type) {
 					case 8: {
 						// Note off
@@ -68,7 +81,19 @@ self.MidiEventPool = class {
 						switch (e1.metaType) {
 							case 81: {
 								// Switch tempo
+								let currTime = timePointer / tempo / division * 60 + pointerOffset;
 								tempo = 60000000 / e1.data;
+								pointerOffset = currTime - timePointer / tempo / division * 60;
+								//debugger;
+								if (tempoChanges[tempoChanges.length - 1]) {
+									if (tempoChanges[tempoChanges.length - 1].end > timePointer) {
+										tempoChanges[tempoChanges.length - 1].end = timePointer;
+									};
+									if (tempoChanges[tempoChanges.length - 1].end - tempoChanges[tempoChanges.length - 1].start < 0.005) {
+										tempoChanges.pop();
+									};
+								};
+								tempoChanges.push(new RangeEvent(timePointer, 281474976710655, [tempo, pointerOffset]));
 								console.debug(`Tempo switched to ${tempo} bpm`);
 								break;
 							};
@@ -91,6 +116,12 @@ self.MidiEventPool = class {
 						console.debug(`Unrecognized event type ${e1.type} on track ${i0}, event ${i1}, time pointer ${timePointer}`);
 					};
 				};
+				let changedTempo = tempoChanges.point(timePointer)[0];
+				if (changedTempo) {
+					tempo = changedTempo.data[0];
+					pointerOffset = changedTempo.data[1];
+					//console.info(Math.floor(changedTempo.data[0]));
+				};
 				if (addEventToTrack) {
 					let targetChannel = 0;
 					if (e1.type != 255) {
@@ -106,11 +137,12 @@ self.MidiEventPool = class {
 					} else {
 						appendObj.meta = e1.channel;
 					};
-					track[targetChannel].push(new PointEvent(timePointer / tempo / division * 60, appendObj));
+					track[targetChannel].push(new PointEvent(timePointer / tempo / division * 60 + pointerOffset, appendObj));
 				};
 			});
 			//console.info(`${tempo}bpm, ${timePointer} deltas`);
 		});
+		console.info(tempoChanges);
 	};
 	reset () {
 		delete this.list;

@@ -68,6 +68,16 @@ self.TimedEvents = class extends self.Array {
 	get pointSpan () {
 		return this.#maxAllowedPointSpan;
 	};
+	point (start) {
+		// Must optimize
+		let array = new TimedEvents();
+		for (let index = 0; index < this.length; index ++) {
+			if (this[index].start <= start && this[index].end > start) {
+				array.push(this[index]);
+			};
+		};
+		return array;
+	};
 	during (start, end) {
 		if (start == end) {
 			start = this.#lastTime;
@@ -121,6 +131,22 @@ self.TimedEventsCollection = class extends self.Array {
 	};
 	get pointSpan () {
 		return this.#maxAllowedPointSpan;
+	};
+	point (start) {
+		// Must optimize
+		let array = [], joined = new TimedEvents();
+		this.forEach(function (e) {
+			if (e.point) {
+				array.push(e.point(start));
+			};
+		});
+		array.forEach(function (e) {
+			e.forEach(function (e1) {
+				joined.push(e1);
+			});
+		});
+		joined.finalize();
+		return joined;
 	};
 	during (start, end) {
 		if (start == end) {

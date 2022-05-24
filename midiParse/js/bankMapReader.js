@@ -2,7 +2,7 @@
 
 self.soundBankInfo = [];
 self.getSoundBank = function (msb, prg, lsb) {
-	let bankName = (msb || 0).toString().padStart(3, "0") + " " + (prg || 0).toString().padStart(3, "0") + " " + (lsb || 0).toString().padStart(3, "0") + " ";
+	let bankName = (msb || 0).toString().padStart(3, "0") + " " + (prg || 0).toString().padStart(3, "0") + " " + (lsb || 0).toString().padStart(3, "0");
 	let to = soundBankInfo;
 	for (let c = 0; c < 3; c ++) {
 		to = to[arguments[c] || 0];
@@ -12,7 +12,7 @@ self.getSoundBank = function (msb, prg, lsb) {
 			bankName = to;
 		};
 	};
-	return bankName.padEnd(9, " ").padStart(10, " ").padEnd(11, " ").padStart(12, " ");
+	return bankName;
 };
 self.renewBankMap = function (type) {
 	fetch(`./data/bank/${type}.tsv`).then(function (response) {return response.text()}).then(function (text) {
