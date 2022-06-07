@@ -157,11 +157,12 @@ audioPlayer.onplaying = function () {
 };
 audioPlayer.onplay = function () {
 	if (this.ended || switchedTrack) {
-		textField.innerHTML = "";
+		textData = "";
 		delete self.pressedNotes;
 		self.pressedNotes = [];
 		switchedTrack = false;
 		barOffsetNotes = 0;
+		karaokeMode = false;
 	};
 };
 audioPlayer.onpause = function () {
@@ -175,10 +176,11 @@ audioPlayer.onended = function () {
 	switchedTrack = true;
 	midiMode = 0;
 	barOffsetNotes = 0;
+	karaokeMode = false;
 };
 const noteNames = ["C~", "C#", "D~", "Eb", "E~", "F~", "F#", "G~", "Ab", "A~", "Bb", "B~"]
 const noteShnms = Array.from("CdDeEFgGaAbB");
-const metaType = ["SEQUENCE_NUM", " COMMON_TEXT", "   COPYRIGHT", "  TRACK_NAME", "  INSTRUMENT", "COMON_LYRICS", "COMON_MARKER", "CM_CUE_POINT"];
+const metaType = ["Seq.Num.", "Cmn.Text", "Copyrght", "Trk Name", "Instrmnt", "C.Lyrics", "C.Marker", "C.CuePnt"];
 const midiModeName = [["??", "GM", "??", "MT", "GS", "XG", "G2"], [
 	"UnkwnStd",
 	"GnrlMIDI",
@@ -192,7 +194,7 @@ const scales = ["M", "m"];
 let musicTempo = 120, musicBInt = 0.5, musicNomin = 4, musicDenom = 4, curBar = 0, curBeat = 0, curBeatFloat = 0;
 let curKey = 0, curScale = 0;
 let polyphony = 0, altPoly = 0, maxPoly = 0, masterVol = 100;
-let midiMode = 0, lastDispTime = -5, barOffsetNotes = 0;
+let midiMode = 0, lastDispTime = -5, barOffsetNotes = 0, karaokeMode = false, textData = "";
 self.pressedNotes = [];
 self.task = setInterval(function () {
 	if (self.midiEventPool && audioPlayer.reallyPlaying) {
@@ -248,11 +250,38 @@ self.task = setInterval(function () {
 						};
 						case 1: {
 							// Common text
-							let unparsed = e.data || "", parsed = unparsed;
-							if (unparsed[0] == "/" || unparsed[0] == "\\") {
-								parsed = `\n${unparsed.slice(1)}`;
+							let unparsed = e.data || "", parsed = `${unparsed}`;
+							if (!karaokeMode) {
+								parsed = `\n${parsed}`;
 							};
-							textField.innerHTML += `${parsed}`;
+							switch (unparsed[0]) {
+								case "/":
+								case "\\": {
+									// Karaoke
+									if (karaokeMode) {
+										parsed = `\n${unparsed.slice(1)}`;
+									};
+									break;
+								};
+								case "@": {
+									parsed = "";
+									if (unparsed[1] == "K") {
+										// Start karaoke mode
+										karaokeMode = true;
+										nearestEvent = "Karaoke Mode";
+									} else if (karaokeMode) {
+										if (unparsed[1] == "L") {
+											// Karaoke language
+											parsed = `\n  K.Lang: ${unparsed.slice(2)}`;
+										} else if (unparsed[1] == "T") {
+											// Karaoke title
+											parsed = `\n K.Title: ${unparsed.slice(3)}`;
+										};
+									};
+									break;
+								};
+							};
+							textData += `${parsed}`;
 						};
 						case 3: {
 							// Track name
@@ -260,7 +289,7 @@ self.task = setInterval(function () {
 						};
 						default: {
 							let temporalDisplay = e.data || "";
-							textField.innerHTML += `${metaType[e.meta] || e.meta || "Empty meta."}${temporalDisplay ? ":" : "!"} ${temporalDisplay}\n`;
+							textData += `\n${metaType[e.meta] || e.meta || "Empty meta."}${temporalDisplay ? ":" : "!"} ${temporalDisplay}`;
 						};
 					};
 					break;
@@ -611,5 +640,19 @@ self.task = setInterval(function () {
 			// Return it to normal
 			xgLetterDisp.className = "";
 		};
+		// Limit maximum lines available for text display
+		textField.innerHTML = "";
+		let origText = textData.split("\n"), intrText = [], newText = "", limitLine = 23 - pressedNotes.length;
+		origText.forEach(function (e) {
+			if (e.trim().length > 0) {
+				intrText.push(e);
+			};
+		});
+		if (intrText.length > limitLine) {
+			intrText = origText.slice(intrText.length - limitLine + 1);
+		};
+		intrText.forEach(function (e) {
+			textField.innerHTML += `${e}\n`;
+		});
 	};
 }, 1000/30);
