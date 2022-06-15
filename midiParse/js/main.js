@@ -249,6 +249,10 @@ self.task = setInterval(function () {
 							//textField.innerHTML += `End of track: ${audioPlayer.currentTime}.\n`;
 							break;
 						};
+						case 127: {
+							// Sequencer specific
+							break;
+						};
 						case 1: {
 							// Common text
 							let unparsed = e.data || "", parsed = `${unparsed}`;
@@ -286,7 +290,11 @@ self.task = setInterval(function () {
 						};
 						case 3: {
 							// Track name
-							trkName = e.data;
+							if (!trkName) {
+								trkName = e.data;
+							} else {
+								textData += `\nTrk Info: ${e.data}`
+							};
 							break;
 						};
 						default: {
@@ -349,6 +357,7 @@ self.task = setInterval(function () {
 					break;
 				};
 				case 11: {
+					// Channel control
 					if (!pressedNotes[e.meta]) {
 						pressedNotes[e.meta] = [];
 						pressedNotes[e.meta].vol = 100;
@@ -372,6 +381,22 @@ self.task = setInterval(function () {
 							// MSB bank select
 							if (midiMode) {
 								pressedNotes[e.meta].msb = e.data[1];
+							} else {
+								switch (e.data) {
+									case 0:
+									case 64:
+									case 126:
+									case 127: {
+										// Might be Yamaha XG. Do nothing.
+										break;
+									};
+									default: {
+										// Must be Roland GS.
+										midiMode = 4;
+										pressedNotes[e.meta].msb = e.data[1];
+										textData += `\nRoland GS detected via MSB select.`;
+									};
+								};
 							};
 							break;
 						};
@@ -412,7 +437,7 @@ self.task = setInterval(function () {
 						};
 						case 32: {
 							// LSB bank select
-							if (midiMode) {
+							if (midiMode == 5) {
 								pressedNotes[e.meta].lsb = e.data[1];
 							};
 							break;
@@ -487,11 +512,38 @@ self.task = setInterval(function () {
 					break;
 				};
 				case 12: {
+					// Program change
 					if (!pressedNotes[e.meta]) {
 						pressedNotes[e.meta] = [];
 						pressedNotes[e.meta].vol = 100;
 						pressedNotes[e.meta].exp = 127;
 						if (e.meta == 9) {
+							if (midiMode == 0) {
+								// GS/XG detection based on program selection
+								switch (e.data) {
+									case 0:
+									case 8:
+									case 16:
+									case 24:
+									case 25:
+									case 32:
+									case 40:
+									case 48: {
+										// Does nothing
+										break;
+									};
+									case 56:
+									case 127: {
+										midiMode = 4;
+										textData += `\nRoland GS detected via drum kit.`;
+										break;
+									};
+									default: {
+										midiMode = 5;
+										textData += `\nYamaha XG detected via drum kit.`;
+									};
+								};
+							};
 							switch (midiMode) {
 								case 4:
 								case 6: {
