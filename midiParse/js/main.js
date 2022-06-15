@@ -194,7 +194,8 @@ const scales = ["M", "m"];
 let musicTempo = 120, musicBInt = 0.5, musicNomin = 4, musicDenom = 4, curBar = 0, curBeat = 0, curBeatFloat = 0;
 let curKey = 0, curScale = 0;
 let polyphony = 0, altPoly = 0, maxPoly = 0, masterVol = 100;
-let midiMode = 0, lastDispTime = -5, barOffsetNotes = 0, karaokeMode = false, textData = "";
+let midiMode = 0, lastDispTime = -5, barOffsetNotes = 0, karaokeMode = false;
+let textData = "", trkName = "";
 self.pressedNotes = [];
 self.task = setInterval(function () {
 	if (self.midiEventPool && audioPlayer.reallyPlaying) {
@@ -285,6 +286,7 @@ self.task = setInterval(function () {
 						};
 						case 3: {
 							// Track name
+							trkName = e.data;
 							break;
 						};
 						default: {
@@ -530,7 +532,7 @@ self.task = setInterval(function () {
 									if (sameArray(msg.slice(1), [22, 18, 127, 1])) {
 										// MT-32 reset
 										midiMode = 3;
-									} else if (sameArray(msg.slice(1), [66, 18, 64, 0, 127, 0, 65])) {
+									} else if (sameArray(msg.slice(1, 3), [66, 18])) {
 										// GS reset
 										midiMode = 4;
 									} else {
@@ -625,7 +627,7 @@ self.task = setInterval(function () {
 		pressedNotes.forEach(function (e0) {
 			polyphony += e0.length;
 		});
-		registerDisp.innerHTML = `Event:${midiEvents.length.toString().padStart(3, "0")} Poly:${Math.max(polyphony, 0).toString().padStart(3, "0")}(${Math.max(maxPoly, 0).toString().padStart(3, "0")})/256 Bar:${(Math.max(0, curBar) + 1).toString().padStart(3, "0")}/${Math.max(0, curBeat) + 1} Vol:${trailPt(masterVol, 1, 1)}%\nMode:${midiModeName[1][midiMode]} Time:${Math.floor(audioPlayer.currentTime / 60).toString().padStart(2,"0")}:${Math.floor(audioPlayer.currentTime % 60).toString().padStart(2,"0")}.${Math.round((audioPlayer.currentTime) % 1 * 1000).toString().padStart(3,"0")} TSig:${musicNomin}/${musicDenom} Key:${noteShnms[curKey]}${scales[curScale]} Tempo:${trailPt(Math.round(musicTempo * 100) / 100)}${nearestEvent ? " Ext:" + nearestEvent : ""}\n\nCH:Ch.Voice BVE RCVTD M PI PAN : NOTE\n`;
+		registerDisp.innerHTML = `Event:${midiEvents.length.toString().padStart(3, "0")} Poly:${Math.max(polyphony, 0).toString().padStart(3, "0")}(${Math.max(maxPoly, 0).toString().padStart(3, "0")})/256 Bar:${(Math.max(0, curBar) + 1).toString().padStart(3, "0")}/${Math.max(0, curBeat) + 1} Vol:${trailPt(masterVol, 1, 1)}% Tempo:${trailPt(Math.round(musicTempo * 100) / 100)}\nMode:${midiModeName[1][midiMode]} Time:${Math.floor(audioPlayer.currentTime / 60).toString().padStart(2,"0")}:${Math.floor(audioPlayer.currentTime % 60).toString().padStart(2,"0")}.${Math.round((audioPlayer.currentTime) % 1 * 1000).toString().padStart(3,"0")} TSig:${musicNomin}/${musicDenom} Key:${noteShnms[curKey]}${scales[curScale]}${trkName ? " Title:" + trkName : ""}${nearestEvent ? " Ext:" + nearestEvent : ""}\n\nCH:Ch.Voice BVE RCVTD M PI PAN : NOTE\n`;
 		pressedNotes.forEach(function (e0, i) {
 			registerDisp.innerHTML += `${(i+1).toString().padStart(2, "0")}:${self.getSoundBank && (midiMode != 4 ? self.getSoundBank(e0.msb, e0.prg, e0.lsb) : self.getSoundBank(e0.lsb, e0.prg, e0.msb)).padEnd(8, " ") || "Unknown "} ${map[(e0.bal || 0) >> 1]}${map[(e0.vol || 0) >> 1]}${map[(e0.exp || 0) >> 1]} ${map[(e0.rev || 0) >> 1]}${map[(e0.cho || 0) >> 1]}${map[(e0.var || 0) >> 1]}${map[(e0.tre || 0) >> 1]}${map[(e0.det || 0) >> 1]} ${((e0.mod || 0) >> 6 > 0) ? "|" : ((e0.mod || 0) >> 4 > 0 ? "~" : "-")} ${textedPitchBend(e0.npb || [0, 64])} ${textedPanning(e0.pan == undefined ? 0 : e0.pan)}: `;
 			Array.from(e0).sort().forEach(function (e1) {
