@@ -180,7 +180,7 @@ audioPlayer.onended = function () {
 };
 const noteNames = ["C~", "C#", "D~", "Eb", "E~", "F~", "F#", "G~", "Ab", "A~", "Bb", "B~"]
 const noteShnms = Array.from("CdDeEFgGaAbB");
-const metaType = ["Seq.Num.", "Cmn.Text", "Copyrght", "Trk Name", "Instrmnt", "C.Lyrics", "C.Marker", "C.CuePnt"];
+const metaType = ["Seq.Num.", "Cmn.Text", "Copyrite", "Trk.Name", "Instrmnt", "C.Lyrics", "C.Marker", "C.CuePnt"];
 const midiModeName = [["??", "GM", "??", "MT", "GS", "XG", "G2"], [
 	"UnkwnStd",
 	"GnrlMIDI",
@@ -627,7 +627,7 @@ self.task = setInterval(function () {
 		pressedNotes.forEach(function (e0) {
 			polyphony += e0.length;
 		});
-		registerDisp.innerHTML = `Event:${midiEvents.length.toString().padStart(3, "0")} Poly:${Math.max(polyphony, 0).toString().padStart(3, "0")}(${Math.max(maxPoly, 0).toString().padStart(3, "0")})/256 Bar:${(Math.max(0, curBar) + 1).toString().padStart(3, "0")}/${Math.max(0, curBeat) + 1} Vol:${trailPt(masterVol, 1, 1)}% Tempo:${trailPt(Math.round(musicTempo * 100) / 100)}\nMode:${midiModeName[1][midiMode]} Time:${Math.floor(audioPlayer.currentTime / 60).toString().padStart(2,"0")}:${Math.floor(audioPlayer.currentTime % 60).toString().padStart(2,"0")}.${Math.round((audioPlayer.currentTime) % 1 * 1000).toString().padStart(3,"0")} TSig:${musicNomin}/${musicDenom} Key:${noteShnms[curKey]}${scales[curScale]}${trkName ? " Title:" + trkName : ""}${nearestEvent ? " Ext:" + nearestEvent : ""}\n\nCH:Ch.Voice BVE RCVTD M PI PAN : NOTE\n`;
+		registerDisp.innerHTML = `Event:${midiEvents.length.toString().padStart(3, "0")} Poly:${Math.max(polyphony, 0).toString().padStart(3, "0")}(${Math.max(maxPoly, 0).toString().padStart(3, "0")})/256 Bar:${(Math.max(0, curBar) + 1).toString().padStart(3, "0")}/${Math.max(0, curBeat) + 1} TSig:${musicNomin}/${musicDenom} Vol:${trailPt(masterVol, 1, 1)}% Tempo:${trailPt(Math.round(musicTempo * 100) / 100)}\nMode:${midiModeName[1][midiMode]} Time:${Math.floor(audioPlayer.currentTime / 60).toString().padStart(2,"0")}:${Math.floor(audioPlayer.currentTime % 60).toString().padStart(2,"0")}.${Math.round((audioPlayer.currentTime) % 1 * 1000).toString().padStart(3,"0")} Key:${noteShnms[curKey]}${scales[curScale]}${trkName ? " Title:" + trkName : ""}${nearestEvent ? " Ext:" + nearestEvent : ""}\n\nCH:Ch.Voice BVE RCVTD M PI PAN : NOTE\n`;
 		pressedNotes.forEach(function (e0, i) {
 			registerDisp.innerHTML += `${(i+1).toString().padStart(2, "0")}:${self.getSoundBank && (midiMode != 4 ? self.getSoundBank(e0.msb, e0.prg, e0.lsb) : self.getSoundBank(e0.lsb, e0.prg, e0.msb)).padEnd(8, " ") || "Unknown "} ${map[(e0.bal || 0) >> 1]}${map[(e0.vol || 0) >> 1]}${map[(e0.exp || 0) >> 1]} ${map[(e0.rev || 0) >> 1]}${map[(e0.cho || 0) >> 1]}${map[(e0.var || 0) >> 1]}${map[(e0.tre || 0) >> 1]}${map[(e0.det || 0) >> 1]} ${((e0.mod || 0) >> 6 > 0) ? "|" : ((e0.mod || 0) >> 4 > 0 ? "~" : "-")} ${textedPitchBend(e0.npb || [0, 64])} ${textedPanning(e0.pan == undefined ? 0 : e0.pan)}: `;
 			Array.from(e0).sort().forEach(function (e1) {
