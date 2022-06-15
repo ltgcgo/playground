@@ -698,7 +698,7 @@ self.task = setInterval(function () {
 		textField.innerHTML = "";
 		let origText = textData.split("\n"), intrText = [], newText = "", limitLine = 23 - pressedNotes.length;
 		if (xgLetterDisp.innerHTML) {
-			limitLine -= 3;
+			limitLine -= 2;
 		};
 		origText.forEach(function (e) {
 			if (e.trim().length > 0) {
