@@ -158,6 +158,7 @@ audioPlayer.onplaying = function () {
 audioPlayer.onplay = function () {
 	if (this.ended || switchedTrack) {
 		textData = "";
+		trkName = "";
 		delete self.pressedNotes;
 		self.pressedNotes = [];
 		switchedTrack = false;
