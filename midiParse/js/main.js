@@ -300,6 +300,11 @@ let polyphony = 0, altPoly = 0, maxPoly = 0, masterVol = 100;
 let midiMode = 0, lastDispTime = -5, barOffsetNotes = 0, karaokeMode = false;
 let textData = "", trkName = "";
 self.pressedNotes = [];
+let bitmapDisp = $e("canvas").getContext("2d");
+let expBitmap = "";
+
+// Initialize bitmap
+bitmapDisp.fillStyle = "#fff";
 
 // MIDI SysEx execution pool
 let sysEx = new prefMatch();
@@ -339,6 +344,13 @@ sysEx.register([67, 16, 76, 6, 0], function (msg) {
 		targetText[pointer + Math.floor(pointer / 16)] = String.fromCharCode(e);
 		xgLetterDisp.innerHTML = targetText.join("");
 		lastDispTime = audioPlayer.currentTime;
+	});
+}).register([67, 16, 76, 7, 0], function (msg) {
+	// XG bitmap display
+	let offset = msg[0];
+	expBitmap = "";
+	msg.slice(1).forEach(function (e) {
+		expBitmap += `${(e & 127).toString(2).padStart(7, "0")}`;
 	});
 });
 
@@ -784,6 +796,7 @@ self.task = setInterval(function () {
 		} else {
 			// Return it to normal
 			xgLetterDisp.className = "";
+			xgLetterDisp.innerText = "";
 		};
 		// Limit maximum lines available for text display
 		textField.innerHTML = "";
@@ -801,6 +814,15 @@ self.task = setInterval(function () {
 		};
 		intrText.forEach(function (e) {
 			textField.innerHTML += `${e}\n`;
+		});
+		// Bitmap display experiment
+		bitmapDisp.fillStyle = "#111";
+		bitmapDisp.fillRect(0, 0, 96, 64);
+		bitmapDisp.fillStyle = "#fff";
+		Array.from(expBitmap.slice(self.sliceFrom || 0)).forEach(function (e, i) {
+			if (e == "1") {
+				bitmapDisp.fillRect((i % 16) * 6, Math.floor(i / 16) << 2, 6, 4);
+			};
 		});
 	};
 }, 1000/30);
