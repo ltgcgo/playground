@@ -826,13 +826,13 @@ self.task = setInterval(function () {
 			textField.innerHTML += `${e}\n`;
 		});
 		// Bitmap display experiment
-		bitmapDisp.fillStyle = "#111";
+		bitmapDisp.fillStyle = "#000";
 		bitmapDisp.fillRect(0, 0, 192, 96);
-		bitmapDisp.fillStyle = "#eee";
+		bitmapDisp.fillStyle = "#ddd";
 		if (Math.abs(audioPlayer.currentTime - lastBmTime) < (musicNomin * musicBInt) << 4) {
 			trueBitmap.forEach(function (e, i) {
 				if (e) {
-					bitmapDisp.fillRect((i % 16) * 12, Math.floor(i / 16) * 6, 11, 5);
+					bitmapDisp.fillRect((i % 16) * 12, Math.floor(i / 16) * 6, 10, 4);
 				};
 			});
 		};
