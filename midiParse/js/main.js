@@ -301,7 +301,7 @@ let midiMode = 0, lastDispTime = -5, barOffsetNotes = 0, karaokeMode = false;
 let textData = "", trkName = "";
 self.pressedNotes = [];
 let bitmapDisp = $e("canvas").getContext("2d");
-let expBitmap = "";
+let trueBitmap = [];
 
 // Initialize bitmap
 bitmapDisp.fillStyle = "#fff";
@@ -345,12 +345,21 @@ sysEx.register([67, 16, 76, 6, 0], function (msg) {
 		xgLetterDisp.innerHTML = targetText.join("");
 		lastDispTime = audioPlayer.currentTime;
 	});
-}).register([67, 16, 76, 7, 0], function (msg) {
+}).register([67, 16, 76, 7, 0, 0], function (msg) {
 	// XG bitmap display
-	let offset = msg[0];
-	expBitmap = "";
-	msg.slice(1).forEach(function (e) {
-		expBitmap += `${(e & 127).toString(2).padStart(7, "0")}`;
+	trueBitmap = [];
+	msg.forEach(function (e, i) {
+		let ln = Math.floor(i / 16), co = i % 16;
+		let pt = (co * 3 + ln) * 7, threshold = 7, bi = 0;
+		pt -= co * 5;
+		if (ln == 2) {
+			threshold = 2;
+		};
+		console.info(pt, threshold);
+		while (bi < threshold) {
+			trueBitmap[pt + bi] = (e >> (6 - bi)) & 1;
+			bi ++;
+		};
 	});
 });
 
@@ -796,7 +805,7 @@ self.task = setInterval(function () {
 		} else {
 			// Return it to normal
 			xgLetterDisp.className = "";
-			xgLetterDisp.innerText = "";
+			xgLetterDisp.innerText = "                \n                ";
 		};
 		// Limit maximum lines available for text display
 		textField.innerHTML = "";
@@ -817,11 +826,11 @@ self.task = setInterval(function () {
 		});
 		// Bitmap display experiment
 		bitmapDisp.fillStyle = "#111";
-		bitmapDisp.fillRect(0, 0, 96, 64);
+		bitmapDisp.fillRect(0, 0, 128, 64);
 		bitmapDisp.fillStyle = "#fff";
-		Array.from(expBitmap.slice(self.sliceFrom || 0)).forEach(function (e, i) {
-			if (e == "1") {
-				bitmapDisp.fillRect((i % 16) * 6, Math.floor(i / 16) << 2, 6, 4);
+		trueBitmap.forEach(function (e, i) {
+			if (e) {
+				bitmapDisp.fillRect((i % 16) << 3, Math.floor(i / 16) << 2, 7, 3);
 			};
 		});
 	};
