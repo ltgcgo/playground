@@ -301,7 +301,7 @@ let midiMode = 0, lastDispTime = -5, barOffsetNotes = 0, karaokeMode = false;
 let textData = "", trkName = "";
 self.pressedNotes = [];
 let bitmapDisp = $e("canvas").getContext("2d");
-let trueBitmap = [];
+let trueBitmap = [], lastBmTime = 0;
 
 // Initialize bitmap
 bitmapDisp.fillStyle = "#fff";
@@ -347,6 +347,7 @@ sysEx.register([67, 16, 76, 6, 0], function (msg) {
 	});
 }).register([67, 16, 76, 7, 0, 0], function (msg) {
 	// XG bitmap display
+	lastBmTime = audioPlayer.currentTime;
 	trueBitmap = [];
 	msg.forEach(function (e, i) {
 		let ln = Math.floor(i / 16), co = i % 16;
@@ -799,7 +800,7 @@ self.task = setInterval(function () {
 			});
 			registerDisp.innerHTML += `\n`;
 		});
-		if (Math.abs(lastDispTime - audioPlayer.currentTime) < 3.2767) {
+		if (Math.abs(lastDispTime - audioPlayer.currentTime) < 3.2) {
 			// Highlight the letter display
 			xgLetterDisp.className = "invert";
 		} else {
@@ -826,12 +827,14 @@ self.task = setInterval(function () {
 		});
 		// Bitmap display experiment
 		bitmapDisp.fillStyle = "#111";
-		bitmapDisp.fillRect(0, 0, 128, 64);
-		bitmapDisp.fillStyle = "#fff";
-		trueBitmap.forEach(function (e, i) {
-			if (e) {
-				bitmapDisp.fillRect((i % 16) << 3, Math.floor(i / 16) << 2, 7, 3);
-			};
-		});
+		bitmapDisp.fillRect(0, 0, 192, 96);
+		bitmapDisp.fillStyle = "#eee";
+		if (Math.abs(audioPlayer.currentTime - lastBmTime) < (musicNomin * musicBInt) << 4) {
+			trueBitmap.forEach(function (e, i) {
+				if (e) {
+					bitmapDisp.fillRect((i % 16) * 12, Math.floor(i / 16) * 6, 11, 5);
+				};
+			});
+		};
 	};
 }, 1000/30);
