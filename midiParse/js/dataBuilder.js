@@ -6,9 +6,9 @@ MidiParser.customInterpreter = function (type, file) {
 	if (type == 127) {
 		metaLength = 1;
 	};
-	let u8Data = new Uint8Array(metaLength);
+	let u8Data = [];
 	for (let c = 0; c < metaLength; c ++) {
-		u8Data[c] = file.readInt(1);
+		u8Data.push(file.readInt(1));
 	};
 	return u8Data;
 };
