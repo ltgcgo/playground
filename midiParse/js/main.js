@@ -499,7 +499,7 @@ self.task = setInterval(function () {
 								switch (midiMode) {
 									case 4:
 									case 6: {
-										pressedNotes[e.meta].lsb = 127;
+										pressedNotes[e.meta].lsb = 120;
 										pressedNotes[e.meta].msb = 0;
 										break;
 									};
@@ -533,7 +533,7 @@ self.task = setInterval(function () {
 							switch (midiMode) {
 								case 4:
 								case 6: {
-									pressedNotes[e.meta].lsb = 127;
+									pressedNotes[e.meta].lsb = 120;
 									pressedNotes[e.meta].msb = 0;
 									break;
 								};
@@ -755,7 +755,7 @@ self.task = setInterval(function () {
 							switch (midiMode) {
 								case 4:
 								case 6: {
-									pressedNotes[e.meta].lsb = 127;
+									pressedNotes[e.meta].lsb = 120;
 									pressedNotes[e.meta].msb = 0;
 									break;
 								};
