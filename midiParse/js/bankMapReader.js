@@ -1,5 +1,7 @@
 "use strict";
 
+const sgCrit = ["MSB", "PRG", "LSB"];
+
 self.soundBankInfo = [];
 self.getSoundBank = function (msb, prg, lsb) {
 	let bankName = (msb || 0).toString().padStart(3, "0") + " " + (prg || 0).toString().padStart(3, "0") + " " + (lsb || 0).toString().padStart(3, "0");
@@ -25,21 +27,32 @@ self.getSoundBank = function (msb, prg, lsb) {
 	};
 	return bankName;
 };
-self.renewBankMap = function (type) {
-	fetch(`./data/bank/${type}.tsv`).then(function (response) {return response.text()}).then(function (text) {
-		delete self.soundBankInfo;
-		self.soundBankInfo = [];
-		text.split("\n").forEach(function (e) {
-			let assign = e.split("\t"), to = [];
-			assign.forEach(function (e, i) {
-				if (i > 2) {
-					soundBankInfo[to[0]] = soundBankInfo[to[0]] || [];
-					soundBankInfo[to[0]][to[1]] = soundBankInfo[to[0]][to[1]] || [];
-					soundBankInfo[to[0]][to[1]][to[2]] = assign[3];
+self.renewBankMap = async function (...type) {
+	delete self.soundBankInfo;
+	self.soundBankInfo = [];
+	for (let c = 0; c < type.length; c ++) {
+		await fetch(`./data/bank/${type[c]}.tsv`).then(function (response) {return response.text()}).then(function (text) {
+			console.info(`Parsing voice map: ${type[c]}`);
+			let sig = []; // Significance
+			text.split("\n").forEach(function (e, i) {
+				let assign = e.split("\t"), to = [];
+				if (i == 0) {
+					assign.forEach(function (e0, i0) {
+						sig[sgCrit.indexOf(e0)] = i0;
+					});
+					console.info(`Bank map significance: ${sig}`);
 				} else {
-					to.push(parseInt(assign[i]));
+					assign.forEach(function (e1, i1) {
+						if (i1 > 2) {
+							soundBankInfo[to[sig[0]]] = soundBankInfo[to[sig[0]]] || [];
+							soundBankInfo[to[sig[0]]][to[sig[1]]] = soundBankInfo[to[sig[0]]][to[sig[1]]] || [];
+							soundBankInfo[to[sig[0]]][to[sig[1]]][to[sig[2]]] = soundBankInfo[to[sig[0]]][to[sig[1]]][to[sig[2]]] || assign[3];
+						} else {
+							to.push(parseInt(assign[i1]));
+						};
+					});
 				};
 			});
 		});
-	});
+	};
 };

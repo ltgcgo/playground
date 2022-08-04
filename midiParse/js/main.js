@@ -231,10 +231,10 @@ self.setAudio = async function (data) {
 	};
 };
 
-renewBankMap("xg");
-setInterval(function () {
+renewBankMap("xg", "gs", "ns5r");
+/* setInterval(function () {
 	renewBankMap("xg");
-}, 5000);
+}, 5000); */
 fetch("./demo/Sam Sketty - Low Down.mid").then(function (response) {return response.blob()}).then(function (blob) {setMidi(blob)});
 
 let textField = $e("#textField");
@@ -284,10 +284,10 @@ audioPlayer.onended = function () {
 const noteNames = ["C~", "C#", "D~", "Eb", "E~", "F~", "F#", "G~", "Ab", "A~", "Bb", "B~"]
 const noteShnms = Array.from("CdDeEFgGaAbB");
 const metaType = ["Seq.Num.", "Cmn.Text", "Copyrite", "Trk.Name", "Instrmnt", "C.Lyrics", "C.Marker", "C.CuePnt"];
-const midiModeName = [["??", "GM", "??", "MT", "GS", "XG", "G2"], [
+const midiModeName = [["??", "GM", "AI", "MT", "GS", "XG", "G2"], [
 	"UnkwnStd",
 	"GnrlMIDI",
-	"UnusedId",
+	"KORG AI2",
 	"RlndMT32",
 	"RolandGS",
 	"YamahaXG",
@@ -324,6 +324,10 @@ sysEx.register([126, 127, 9, 1], function () {
 	// Roland GS reset
 	midiMode = 4;
 	console.info(`Roland GS reset: ${msg}`);
+}).register([66, 48, 66], function (msg) {
+	// KORG NS5R/NX5R System Exclusive
+	// No available data for parsing yet...
+	//midiMode = 2;
 }).register([67, 16, 76, 0, 0, 126, 0], function (msg) {
 	// Yamaha XG reset
 	midiMode = 5;
@@ -552,15 +556,28 @@ self.task = setInterval(function () {
 							} else {
 								switch (e.data[1]) {
 									case 0: {
-										// Might be Yamaha XG. Do nothing.
+										// Melodic voices. Might be Yamaha XG. Do nothing.
 										break;
 									};
-									case 64:
-									case 126:
-									case 127: {
+									case 64: // XG SFX
+									case 126: // XG SFX Kits
+									case 127: { // XG Drum Kits
 										midiMode = 5;
 										pressedNotes[e.meta].msb = e.data[1];
 										textData += `\nYamaha XG detected via MSB select.`;
+										break;
+									};
+									case 56: // KORG GM-b
+									case 61: // KORG Drum Kits
+									case 81: // KORG 05R/W
+									case 82: // KORG "ProgB"
+									case 83: // KORG "ProgC"
+									case 89: // KORG "CmbA"
+									case 90: // KORG "CmbB"
+									case 91: { // KORG "CmbC"
+										midiMode = 2;
+										pressedNotes[e.meta].msb = e.data[1];
+										textData += `\nKORG AI2 detected via MSB select.`;
 										break;
 									};
 									default: {
@@ -614,9 +631,7 @@ self.task = setInterval(function () {
 						};
 						case 32: {
 							// LSB bank select
-							if (midiMode == 5) {
-								pressedNotes[e.meta].lsb = e.data[1];
-							};
+							pressedNotes[e.meta].lsb = e.data[1];
 							break;
 						};
 						case 64: {
@@ -794,7 +809,7 @@ self.task = setInterval(function () {
 		});
 		registerDisp.innerHTML = `Event:${midiEvents.length.toString().padStart(3, "0")} Poly:${Math.max(polyphony, 0).toString().padStart(3, "0")}(${Math.max(maxPoly, 0).toString().padStart(3, "0")})/256 TSig:${musicNomin}/${musicDenom} Bar:${(Math.max(0, curBar) + 1).toString().padStart(3, "0")}/${Math.max(0, curBeat) + 1} Tempo:${trailPt(Math.round(musicTempo * 100) / 100)} Vol:${trailPt(masterVol, 1, 1)}%\nMode:${midiModeName[1][midiMode]} Time:${Math.floor(audioPlayer.currentTime / 60).toString().padStart(2,"0")}:${Math.floor(audioPlayer.currentTime % 60).toString().padStart(2,"0")}.${Math.round((audioPlayer.currentTime) % 1 * 1000).toString().padStart(3,"0")} Key:${noteShnms[curKey]}${scales[curScale]}${trkName ? " Title:" + trkName : ""}${nearestEvent ? " Ext:" + nearestEvent : ""}\n\nCH:Ch.Voice BVE RCVTD PPP M PI PAN : NOTE\n`;
 		pressedNotes.forEach(function (e0, i) {
-			registerDisp.innerHTML += `${(i+1).toString().padStart(2, "0")}:${self.getSoundBank && (midiMode != 4 ? self.getSoundBank(e0.msb, e0.prg, e0.lsb) : self.getSoundBank(e0.lsb, e0.prg, e0.msb)).padEnd(8, " ") || "Unknown "} ${map[(e0.bal || 0) >> 1]}${map[(e0.vol || 0) >> 1]}${map[(e0.exp || 0) >> 1]} ${map[(e0.rev || 0) >> 1]}${map[(e0.cho || 0) >> 1]}${map[(e0.var || 0) >> 1]}${map[(e0.tre || 0) >> 1]}${map[(e0.det || 0) >> 1]} ${map[(e0.ped || 0) >> 1]}${(e0.pon >= 64 ? "O" : "X")}${map[(e0.por || 0) >> 1]} ${((e0.mod || 0) >> 6 > 0) ? "|" : ((e0.mod || 0) >> 4 > 0 ? "~" : "-")} ${textedPitchBend(e0.npb || [0, 64])} ${textedPanning(e0.pan == undefined ? 0 : e0.pan)}: `;
+			registerDisp.innerHTML += `${(i+1).toString().padStart(2, "0")}:${self.getSoundBank && self.getSoundBank(e0.msb, e0.prg, e0.lsb).padEnd(8, " ") || "Unknown "} ${map[(e0.bal || 0) >> 1]}${map[(e0.vol || 0) >> 1]}${map[(e0.exp || 0) >> 1]} ${map[(e0.rev || 0) >> 1]}${map[(e0.cho || 0) >> 1]}${map[(e0.var || 0) >> 1]}${map[(e0.tre || 0) >> 1]}${map[(e0.det || 0) >> 1]} ${map[(e0.ped || 0) >> 1]}${(e0.pon >= 64 ? "O" : "X")}${map[(e0.por || 0) >> 1]} ${((e0.mod || 0) >> 6 > 0) ? "|" : ((e0.mod || 0) >> 4 > 0 ? "~" : "-")} ${textedPitchBend(e0.npb || [0, 64])} ${textedPanning(e0.pan == undefined ? 0 : e0.pan)}: `;
 			Array.from(e0).sort(function (a, b) {return Math.sign(a - b)}).forEach(function (e1) {
 				registerDisp.innerHTML += `${noteNames[e1%12]}${Math.floor(e1/12)} `;
 			});
