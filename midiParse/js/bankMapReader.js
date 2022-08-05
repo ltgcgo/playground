@@ -3,8 +3,8 @@
 const sgCrit = ["MSB", "PRG", "LSB"];
 
 self.soundBankInfo = [];
-self.getSoundBank = function (msb, prg, lsb) {
-	let bankName = (msb || 0).toString().padStart(3, "0") + " " + (prg || 0).toString().padStart(3, "0") + " " + (lsb || 0).toString().padStart(3, "0");
+self.getSoundBank = function (msb = 0, prg = 0, lsb = 0) {
+	let bankName;
 	let args = Array.from(arguments);
 	if (args[0] == 127 && args[2] == 0) {
 		if (args[1] > 111) {
@@ -18,14 +18,25 @@ self.getSoundBank = function (msb, prg, lsb) {
 	};
 	let to = soundBankInfo;
 	for (let c = 0; c < 3; c ++) {
-		to = to[args[c] || 0];
+		to = to[args[c] || 0] || "";
 		if (!to) {
-			break;
-		} else if (c == 2) {
-			bankName = to;
+			if (c == 2) {
+				bankName = Array.from(soundBankInfo[0][prg][0]);
+				bankName[7] = "!";
+				bankName = bankName.join("");
+			} else {
+				continue;
+			};
+		} else {
+			if (c == 2) {
+				bankName = to;
+			};
 		};
 	};
-	return bankName;
+	if (!bankName) {
+		//debugger;
+	};
+	return bankName || (msb || 0).toString().padStart(3, "0") + " " + (prg || 0).toString().padStart(3, "0") + " " + (lsb || 0).toString().padStart(3, "0");
 };
 self.renewBankMap = async function (...type) {
 	delete self.soundBankInfo;
