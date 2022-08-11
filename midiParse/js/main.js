@@ -185,6 +185,82 @@ let textedPanning = function (number) {
 	};
 	return result.join("");
 };
+let getStd = function (msb = 0, prg = 0, lsb = 0) {
+	let src = midiModeName[0],
+	result = src[0];
+	switch (msb) {
+		case 0: {
+			if (lsb == 0) {
+				// General MIDI
+				result = src[1];
+			} else if (lsb > 125) {
+				// Roland MT-32
+				result = src[3];
+			} else {
+				// YAMAHA XG
+				result = src[5];
+			};
+			break;
+		};
+		case 1:
+		case 2:
+		case 3:
+		case 4:
+		case 5:
+		case 6:
+		case 7:
+		case 8:
+		case 9:
+		case 10:
+		case 11:
+		case 12:
+		case 13:
+		case 14:
+		case 15:
+		case 16:
+		case 24:
+		case 32:
+		case 120: {
+			// Roland GS
+			result = src[4];
+			break;
+		};
+		case 56:
+		case 61:
+		case 62:
+		case 82:
+		case 83:
+		case 89:
+		case 90:
+		case 91: {
+			// KORG
+			result = src[2];
+			break;
+		};
+		case 64:
+		case 126:
+		case 127: {
+			if (lsb < 126) {
+				// YAMAHA XG
+				result = src[5];
+			} else {
+				result = src[3];
+			};
+			break;
+		};
+		case 81: {
+			// KORG 05R/W
+			result = "RW";
+			break;
+		};
+		case 121: {
+			// General MIDI level 2
+			result = src[6];
+			break;
+		};
+	};
+	return result;
+};
 
 {
 	self.randomID = function (length) {
@@ -292,7 +368,7 @@ const midiModeName = [["??", "GM", "AI", "MT", "GS", "XG", "G2"], [
 	"RolandGS",
 	"YamahaXG",
 	"GenMIDI2"
-]];
+], [256, 128, 256, 32, 256, 256, 256]];
 const scales = ["M", "m"];
 let musicTempo = 120, musicBInt = 0.5, musicNomin = 4, musicDenom = 4, curBar = 0, curBeat = 0, curBeatFloat = 0;
 let curKey = 0, curScale = 0;
@@ -302,9 +378,28 @@ let textData = "", trkName = "";
 self.pressedNotes = [];
 let bitmapDisp = $e("canvas").getContext("2d");
 let trueBitmap = [], lastBmTime = 0;
+let subMsb = 0, subLsb = 0;
 
 // Initialize bitmap
 bitmapDisp.fillStyle = "#fff";
+
+// MIDI SysEx reused code
+let mt32ToneProp = function (channel, msg) {
+	if (midiMode != 3) {
+		textData += `\nRoland MT-32 detected via tone properties.`;
+		subMsb = 0, subLsb = 127;
+	};
+	midiMode = midiMode || 3;
+	let targetCh = pressedNotes[channel];
+	targetCh.npg = targetCh.prg;
+	targetCh.nme = "";
+	msg.slice(0, 10).forEach(function (e) {
+		if (e > 31) {
+			targetCh.nme += String.fromCharCode(e);
+		};
+	});
+	console.warn(`MT-32 channel ${channel + 1} (${targetCh.nme}) received:`, msg);
+};
 
 // MIDI SysEx execution pool
 let sysEx = new prefMatch();
@@ -313,29 +408,41 @@ sysEx.default = function (prefix, channel, time) {
 };
 sysEx.register([126, 127, 9, 1], function () {
 	// General MIDI reset
+	subMsb = 0, subLsb = 0;
 	midiMode = 1;
+	console.info("MIDI reset: GM");
 }).register([126, 127, 9, 1], function () {
 	// General MIDI rev. 2 reset
+	subMsb = 0, subLsb = 0;
 	midiMode = 6;
+	console.info("MIDI reset: GM2");
 }).register([65, 16, 22, 18, 127, 1], function () {
 	// MT-32 reset
+	subMsb = 127, subLsb = 127;
 	midiMode = 3;
+	console.info("MIDI reset: MT-32");
 }).register([65, 16, 66, 18], function (msg) {
 	// Roland GS reset
+	subMsb = 0, subLsb = 0;
 	midiMode = 4;
 	console.info(`Roland GS reset: ${msg}`);
-}).register([66, 48, 66], function (msg) {
+	console.info("MIDI reset: GS");
+}).register([66, 48, 66, 52, 0], function (msg) {
 	// KORG NS5R/NX5R System Exclusive
 	// No available data for parsing yet...
-	//midiMode = 2;
+	subMsb = 0, subLsb = 0;
+	midiMode = 2;
+	console.info("KORG reset:", msg);
 }).register([67, 16, 76, 0, 0, 126, 0], function (msg) {
 	// Yamaha XG reset
+	subMsb = 0, subLsb = 0;
 	midiMode = 5;
+	console.info("MIDI reset: XG");
 });
 // General MIDI SysEx messages
 sysEx.register([127, 127, 4, 1], function (msg) {
 	// Master volume
-	midiMode = 1;
+	//midiMode = 1;
 	masterVol = (msg[1] << 7 + msg[0]) / 163.83;
 });;
 // Yamaha XG SysEx messages
@@ -367,8 +474,30 @@ sysEx.register([67, 16, 76, 6, 0], function (msg) {
 		};
 	});
 });
+// Roland MT-32 SysEx
+sysEx.register([65, 1, 22, 18, 2, 0, 0], function (msg) {
+	mt32ToneProp(1, msg);
+}).register([65, 2, 22, 18, 2, 0, 0], function (msg) {
+	mt32ToneProp(2, msg);
+}).register([65, 3, 22, 18, 2, 0, 0], function (msg) {
+	mt32ToneProp(3, msg);
+}).register([65, 4, 22, 18, 2, 0, 0], function (msg) {
+	mt32ToneProp(4, msg);
+}).register([65, 5, 22, 18, 2, 0, 0], function (msg) {
+	mt32ToneProp(5, msg);
+}).register([65, 6, 22, 18, 2, 0, 0], function (msg) {
+	mt32ToneProp(6, msg);
+}).register([65, 7, 22, 18, 2, 0, 0], function (msg) {
+	mt32ToneProp(7, msg);
+}).register([65, 8, 22, 18, 2, 0, 0], function (msg) {
+	mt32ToneProp(8, msg);
+}).register([65, 9, 22, 18, 2, 0, 0], function (msg) {
+	mt32ToneProp(9, msg);
+});
 
+let curFps = 0, lastFrame = Date.now();
 self.task = setInterval(function () {
+	curFps = Math.round(1000 / (Date.now() - lastFrame));
 	if (self.midiEventPool && audioPlayer.reallyPlaying) {
 		self.midiEvents = midiEventPool.list.at(audioPlayer.currentTime - audioDelay);
 		let progressNotes = (audioPlayer.currentTime - audioDelay) / musicBInt, totalNotes = progressNotes - barOffsetNotes;
@@ -381,9 +510,18 @@ self.task = setInterval(function () {
 					switch (e.meta) {
 						case 88: {
 							// Time signature
+							let oldNomin = musicNomin;
+							let oldDenom = musicDenom;
 							musicNomin = e.data[0];
 							musicDenom = 1 << e.data[1];
 							let metronomClick = 24 * (32 / e.data[3]) / e.data[2];
+							if (oldNomin != musicNomin) {
+								if (curBeat < 1) {
+									barOffsetNotes += progressNotes - (curBar * musicNomin + curBeat);
+								} else {
+									barOffsetNotes += progressNotes - (curBar + 1) * musicNomin;
+								};
+							};
 							break;
 						};
 						case 81: {
@@ -410,6 +548,11 @@ self.task = setInterval(function () {
 						};
 						case 33: {
 							// I don't know what it does, really. Just that the Monkey Island MIDI file appeared this.
+							/*if (midiMode != 3) {
+								textData += `\nRoland MT-32 detected via meta events.`;
+							};
+							midiMode = midiMode || 3;
+							subMsb = 127, subLsb = 127;*/
 							break;
 						};
 						case 47: {
@@ -513,7 +656,9 @@ self.task = setInterval(function () {
 								};
 							};
 						};
-						pressedNotes[e.meta].push(e.data[0]);
+						if (pressedNotes[e.meta].indexOf(e.data[0]) == -1) {
+							pressedNotes[e.meta].push(e.data[0]);
+						};
 						altPoly ++;
 					};
 					if (maxPoly < Math.max(altPoly, polyphony)) {
@@ -567,10 +712,11 @@ self.task = setInterval(function () {
 										textData += `\nYamaha XG detected via MSB select.`;
 										break;
 									};
-									case 56: // KORG GM-b
+									case 56: // KORG AG-10
 									case 61: // KORG Drum Kits
+									case 62: // KORG Drum Kits
 									case 81: // KORG 05R/W
-									case 82: // KORG "ProgB"
+									case 82: // KORG X5D
 									case 83: // KORG "ProgC"
 									case 89: // KORG "CmbA"
 									case 90: // KORG "CmbB"
@@ -722,9 +868,6 @@ self.task = setInterval(function () {
 						case 121: {
 							// Controller reset
 							//textField.innerHTML += "Controller has reset.\n";
-							if (!midiMode) {
-								midiMode = 1;
-							};
 							break;
 						};
 						default: {
@@ -807,9 +950,9 @@ self.task = setInterval(function () {
 		pressedNotes.forEach(function (e0) {
 			polyphony += e0.length;
 		});
-		registerDisp.innerHTML = `Event:${midiEvents.length.toString().padStart(3, "0")} Poly:${Math.max(polyphony, 0).toString().padStart(3, "0")}(${Math.max(maxPoly, 0).toString().padStart(3, "0")})/256 TSig:${musicNomin}/${musicDenom} Bar:${(Math.max(0, curBar) + 1).toString().padStart(3, "0")}/${Math.max(0, curBeat) + 1} Tempo:${trailPt(Math.round(musicTempo * 100) / 100)} Vol:${trailPt(masterVol, 1, 1)}%\nMode:${midiModeName[1][midiMode]} Time:${Math.floor(audioPlayer.currentTime / 60).toString().padStart(2,"0")}:${Math.floor(audioPlayer.currentTime % 60).toString().padStart(2,"0")}.${Math.round((audioPlayer.currentTime) % 1 * 1000).toString().padStart(3,"0")} Key:${noteShnms[curKey]}${scales[curScale]}${trkName ? " Title:" + trkName : ""}${nearestEvent ? " Ext:" + nearestEvent : ""}\n\nCH:Ch.Voice BVE RCVTD PPP M PI PAN : NOTE\n`;
+		registerDisp.innerHTML = `Event:${midiEvents.length.toString().padStart(3, "0")} Poly:${Math.max(polyphony, 0).toString().padStart(3, "0")}(${Math.max(maxPoly, 0).toString().padStart(3, "0")})/${midiModeName[2][midiMode].toString().padStart(3, "0")} TSig:${musicNomin}/${musicDenom} Bar:${(Math.max(0, curBar) + 1).toString().padStart(3, "0")}/${Math.max(0, curBeat) + 1} Tempo:${trailPt(Math.round(musicTempo * 100) / 100)} Vol:${trailPt(masterVol, 1, 1)}%\nMode:${midiModeName[1][midiMode]} Time:${Math.floor(audioPlayer.currentTime / 60).toString().padStart(2,"0")}:${Math.floor(audioPlayer.currentTime % 60).toString().padStart(2,"0")}.${Math.round((audioPlayer.currentTime) % 1 * 1000).toString().padStart(3,"0")} Key:CM${trkName ? " Title:" + trkName : ""}${nearestEvent ? " Ext:" + nearestEvent : ""}\n\nCH:Ch.Voice St BVE RCVTD PPP M PI PAN : NOTE\n`;
 		pressedNotes.forEach(function (e0, i) {
-			registerDisp.innerHTML += `${(i+1).toString().padStart(2, "0")}:${self.getSoundBank && self.getSoundBank(e0.msb, e0.prg, e0.lsb).padEnd(8, " ") || "Unknown "} ${map[(e0.bal || 0) >> 1]}${map[(e0.vol || 0) >> 1]}${map[(e0.exp || 0) >> 1]} ${map[(e0.rev || 0) >> 1]}${map[(e0.cho || 0) >> 1]}${map[(e0.var || 0) >> 1]}${map[(e0.tre || 0) >> 1]}${map[(e0.det || 0) >> 1]} ${map[(e0.ped || 0) >> 1]}${(e0.pon >= 64 ? "O" : "X")}${map[(e0.por || 0) >> 1]} ${((e0.mod || 0) >> 6 > 0) ? "|" : ((e0.mod || 0) >> 4 > 0 ? "~" : "-")} ${textedPitchBend(e0.npb || [0, 64])} ${textedPanning(e0.pan == undefined ? 0 : e0.pan)}: `;
+			registerDisp.innerHTML += `${(i+1).toString().padStart(2, "0")}:${(midiMode == 3 && e0.npg == (e0.prg || 0)) ? e0.nme?.trimEnd() || "NmeUnset" : self.getSoundBank && self.getSoundBank(e0.msb || subMsb, e0.prg, e0.lsb || subLsb).padEnd(8, " ") || "Unknown "} ${getStd(e0.msb || subMsb, e0.prg, e0.lsb || subLsb)} ${map[(e0.bal || 0) >> 1]}${map[(e0.vol || 0) >> 1]}${map[(e0.exp || 0) >> 1]} ${map[(e0.rev || 0) >> 1]}${map[(e0.cho || 0) >> 1]}${map[(e0.var || 0) >> 1]}${map[(e0.tre || 0) >> 1]}${map[(e0.det || 0) >> 1]} ${map[(e0.ped || 0) >> 1]}${(e0.pon >= 64 ? "O" : "X")}${map[(e0.por || 0) >> 1]} ${((e0.mod || 0) >> 6 > 0) ? "|" : ((e0.mod || 0) >> 4 > 0 ? "~" : "-")} ${textedPitchBend(e0.npb || [0, 64])} ${textedPanning(e0.pan == undefined ? 0 : e0.pan)}: `;
 			Array.from(e0).sort(function (a, b) {return Math.sign(a - b)}).forEach(function (e1) {
 				registerDisp.innerHTML += `${noteNames[e1%12]}${Math.floor(e1/12)} `;
 			});
@@ -852,4 +995,5 @@ self.task = setInterval(function () {
 			});
 		};
 	};
+	lastFrame = Date.now();
 }, 1000/50);

@@ -12,7 +12,7 @@ self.getSoundBank = function (msb = 0, prg = 0, lsb = 0) {
 		};
 	};
 	if (args[0] == 0) {
-		if (args[2] > 111) {
+		if (args[2] > 111 && args[2] < 120) {
 			args[2] = 0;
 		};
 	};
@@ -20,9 +20,9 @@ self.getSoundBank = function (msb = 0, prg = 0, lsb = 0) {
 	for (let c = 0; c < 3; c ++) {
 		to = to[args[c] || 0] || "";
 		if (!to) {
-			if (c == 2) {
+			if (c == 2 && !self.debugMode) {
 				bankName = Array.from(soundBankInfo[0][prg][0]);
-				bankName[7] = "!";
+				bankName[7] = "^";
 				bankName = bankName.join("");
 			} else {
 				continue;
