@@ -3,6 +3,81 @@
 let midiBlob, midiBuffer, midiJson, msgPort;
 const map = "0123456789_aAbBcCdDeEfFgGhHiIjJ-kKlLmMnNoOpPqQrRsStTuUvVwWxXyYzZ";
 
+let xgEffType = [
+	"off",
+	"hall",
+	"room",
+	"stage",
+	"plate",
+	"delay LCR",
+	"delay LR",
+	"echo",
+	"cross delay",
+	"early reflections",
+	"gate reverb",
+	"reverse gate"
+];
+xgEffType[16] = "white room";
+xgEffType[17] = "tunnel";
+xgEffType[19] = "basement";
+xgEffType[20] = "karaoke";
+xgEffType[64] = "pass through";
+xgEffType[65] = "chorus";
+xgEffType[66] = "celeste";
+xgEffType[67] = "flanger";
+xgEffType[68] = "symphonic";
+xgEffType[69] = "rotary speaker";
+xgEffType[70] = "tremelo";
+xgEffType[71] = "auto pan";
+xgEffType[72] = "phaser";
+xgEffType[73] = "distortion";
+xgEffType[74] = "overdrive";
+xgEffType[75] = "amplifier";
+xgEffType[76] = "3-band EQ";
+xgEffType[77] = "2-band EQ";
+xgEffType[78] = "auto wah";
+const xgPartMode = [
+	"melodic",
+	"drum",
+	"drum set 1",
+	"drum set 2"
+];
+const xgDelOffset = [
+	17.1, 18.6, 20.2, 21.8, 23.3,
+	24.9, 26.5, 28, 29.6, 31.2,
+	32.8, 34.3, 35.9, 37.5, 39,
+	40.6, 42.2, 43.7, 45.3, 46.9,
+	48.4, 50
+];
+const xgNormFreq = [
+	20, 22, 25, 28, 32, 36, 40, 45,
+	50, 56, 63, 70, 80, 90, 100, 110,
+	125, 140, 160, 180, 200, 225, 250, 280,
+	315, 355, 400, 450, 500, 560, 630, 700,
+	800, 900, 1E3, 1100, 1200, 1400, 1600, 1800,
+	2E3, 2200, 2500, 2800, 3200, 3600, 4E3, 4500,
+	5E3, 5600, 6300, 7E3, 8E3, 9E3, 1E4, 11E3,
+	12E3, 14E3, 16E3, 18E3, 2E4
+];
+const xgLfoFreq = [
+	0, 0.04, 0.08, 0.13, 0.17, 0.21, 0.25, 0.29,
+	0.34, 0.38, 0.42, 0.46, 0.51, 0.55, 0.59, 0.63,
+	0.67, 0.72, 0.76, 0.8, 0.84, 0.88, 0.93, 0.97,
+	1.01, 1.05, 1.09, 1.14, 1.18, 1.22, 1.26, 1.3,
+	1.35, 1.39, 1.43, 1.47, 1.51, 1.56, 1.6, 1.64,
+	1.68, 1.72, 1.77, 1.81, 1.85, 1.89, 1.94, 1.98,
+	2.02, 2.06, 2.10, 2.15, 2.19, 2.23, 2.27, 2.31,
+	2.36, 2.4, 2.44, 2.48, 2.52, 2.57, 2.61, 2.65,
+	2.69, 2.78, 2.86, 2.94, 3.03, 3.11, 3.2, 3.28,
+	3.37, 3.45, 3.53, 3.62, 3.7, 3.87, 4.04, 4.21,
+	4,37, 4.54, 4.71, 4.88, 5.05, 5.22, 5.38, 5.55,
+	5.72, 6.06, 6.39, 6.73, 7.07, 7.4, 7.74, 8.08,
+	8.41, 8.75, 9.08, 9.42, 9.76, 10.1, 10.8, 11.4,
+	12.1, 12.8, 13.5, 14.1, 14.8, 15.5, 16.2, 16.8,
+	17.5, 18.2, 19.5, 20.9, 22.2, 23.6, 24.9, 26.2,
+	27.6, 28.9, 30.3, 31.6, 33.0, 34.3, 37.0, 39.7
+];
+
 // Quick paths
 self.$e = function (selector, source) {
 	if (!source) {
@@ -185,6 +260,22 @@ let textedPanning = function (number) {
 	};
 	return result.join("");
 };
+let getMsb = function (mode, channel) {
+	if (channel % 16 == 9) {
+		switch (mode) {
+			case 4:
+			case 6: {
+				return 120;
+				break;
+			};
+			default: {
+				return 127;
+			};
+		};
+	} else {
+		return 0;
+	};
+};
 let getStd = function (msb = 0, prg = 0, lsb = 0) {
 	let src = midiModeName[0],
 	result = src[0];
@@ -225,10 +316,13 @@ let getStd = function (msb = 0, prg = 0, lsb = 0) {
 			result = src[4];
 			break;
 		};
-		case 56:
+		case 56: {
+			// KORG AG-10
+			result = "AG";
+			break;
+		};
 		case 61:
 		case 62:
-		case 82:
 		case 83:
 		case 89:
 		case 90:
@@ -253,6 +347,11 @@ let getStd = function (msb = 0, prg = 0, lsb = 0) {
 			result = "RW";
 			break;
 		};
+		case 82: {
+			// KORG X5D
+			result = "XD";
+			break;
+		};
 		case 121: {
 			// General MIDI level 2
 			result = src[6];
@@ -260,6 +359,29 @@ let getStd = function (msb = 0, prg = 0, lsb = 0) {
 		};
 	};
 	return result;
+};
+let getDecibel = function (raw) {
+	return Math.round(2000 * Math.log10(raw / 63.65077867)) / 100;
+};
+let getXgRevTime = function (data) {
+	let a = 0.1, b = -0.3;
+	if (data > 66) {
+		a = 5, b = 315;
+	} else if (data > 56) {
+		a = 1, b = 47;
+	} else if (data > 46) {
+		a = 0.5, b = 18.5;
+	};
+	return a * data - b;
+};
+let getXgDelayOffset = function (data) {
+	if (data > 105) {
+		return xgDelOffset[data - 106];
+	} else if (data > 100) {
+		return data * 1.1 - 100;
+	} else {
+		return data / 10;
+	};
 };
 
 {
@@ -406,12 +528,16 @@ let sysEx = new prefMatch();
 sysEx.default = function (prefix, channel, time) {
 	console.warn(prefix, channel, time);
 };
+let xgPartConf = new prefMatch();
+xgPartConf.default = function (prefix, channel, time) {
+	console.warn(`XG part setup on channel ${channel}: `, prefix, time);
+};
 sysEx.register([126, 127, 9, 1], function () {
 	// General MIDI reset
 	subMsb = 0, subLsb = 0;
 	midiMode = 1;
 	console.info("MIDI reset: GM");
-}).register([126, 127, 9, 1], function () {
+}).register([126, 127, 9, 3], function () {
 	// General MIDI rev. 2 reset
 	subMsb = 0, subLsb = 0;
 	midiMode = 6;
@@ -473,6 +599,113 @@ sysEx.register([67, 16, 76, 6, 0], function (msg) {
 			bi ++;
 		};
 	});
+}).register([67, 16, 76, 2, 1, 0], function (msg) {
+	console.info(`XG reverb type: ${xgEffType[msg[0]]}${msg[1] > 0 ? " " + (msg[1] + 1) : ""}`);
+}).register([67, 16, 76, 2, 1, 2], function (msg) {
+	console.info(`XG reverb time: ${getXgRevTime(msg)}s`);
+}).register([67, 16, 76, 2, 1, 3], function (msg) {
+	console.info(`XG reverb diffusion: ${msg}`);
+}).register([67, 16, 76, 2, 1, 4], function (msg) {
+	console.info(`XG reverb initial delay: ${msg}`);
+}).register([67, 16, 76, 2, 1, 5], function (msg) {
+	console.info(`XG reverb high pass cutoff: ${xgNormFreq[msg[0]]}Hz`);
+}).register([67, 16, 76, 2, 1, 6], function (msg) {
+	console.info(`XG reverb low pass cutoff: ${xgNormFreq[msg[0]]}Hz`);
+}).register([67, 16, 76, 2, 1, 7], function (msg) {
+	console.info(`XG reverb width: ${msg}`);
+}).register([67, 16, 76, 2, 1, 8], function (msg) {
+	console.info(`XG reverb height: ${msg}`);
+}).register([67, 16, 76, 2, 1, 9], function (msg) {
+	console.info(`XG reverb depth: ${msg}`);
+}).register([67, 16, 76, 2, 1, 10], function (msg) {
+	console.info(`XG reverb wall type: ${msg}`);
+}).register([67, 16, 76, 2, 1, 11], function (msg) {
+	console.info(`XG reverb dry/wet: ${msg[0]}`);
+}).register([67, 16, 76, 2, 1, 12], function (msg) {
+	console.info(`XG reverb return: ${msg}`);
+}).register([67, 16, 76, 2, 1, 13], function (msg) {
+	console.info(`XG reverb pan: ${textedPanning(msg[0])}`);
+}).register([67, 16, 76, 2, 1, 16], function (msg) {
+	console.info(`XG reverb delay: ${msg}`);
+}).register([67, 16, 76, 2, 1, 17], function (msg) {
+	console.info(`XG density: ${msg}`);
+}).register([67, 16, 76, 2, 1, 18], function (msg) {
+	console.info(`XG reverb balance: ${msg}`);
+}).register([67, 16, 76, 2, 1, 20], function (msg) {
+	console.info(`XG reverb feedback: ${msg}`);
+}).register([67, 16, 76, 2, 1, 32], function (msg) {
+	console.info(`XG chorus type: ${xgEffType[msg[0]]}${msg[1] > 0 ? " " + (msg[1] + 1) : ""}`);
+}).register([67, 16, 76, 2, 1, 34], function (msg) {
+	console.info(`XG chorus LFO: ${xgLfoFreq[msg[0]]}Hz`);
+}).register([67, 16, 76, 2, 1, 35], function (msg) {
+	console.info(`XG chorus LFO phase: ${msg}`);
+}).register([67, 16, 76, 2, 1, 36], function (msg) {
+	console.info(`XG chorus feedback: ${msg}`);
+}).register([67, 16, 76, 2, 1, 37], function (msg) {
+	console.info(`XG chorus delay offset: ${getXgDelayOffset(msg[0])}ms`);
+}).register([67, 16, 76, 2, 1, 39], function (msg) {
+	console.info(`XG chorus low: ${xgNormFreq[msg[0]]}Hz`);
+}).register([67, 16, 76, 2, 1, 40], function (msg) {
+	console.info(`XG chorus low: ${msg[0] - 64}dB`);
+}).register([67, 16, 76, 2, 1, 41], function (msg) {
+	console.info(`XG chorus high: ${xgNormFreq[msg[0]]}Hz`);
+}).register([67, 16, 76, 2, 1, 42], function (msg) {
+	console.info(`XG chorus high: ${msg[0] - 64}dB`);
+}).register([67, 16, 76, 2, 1, 43], function (msg) {
+	console.info(`XG chorus dry/wet: ${msg}`);
+}).register([67, 16, 76, 2, 1, 44], function (msg) {
+	console.info(`XG chorus return: ${msg}`);
+}).register([67, 16, 76, 2, 1, 45], function (msg) {
+	console.info(`XG chorus pan: ${textedPanning(msg[0])}`);
+}).register([67, 16, 76, 2, 1, 46], function (msg) {
+	console.info(`XG chorus to reverb: ${msg}`);
+}).register([67, 16, 76, 2, 1, 64], function (msg) {
+	console.info(`XG variation type: ${xgEffType[msg[0]]}${msg[1] > 0 ? " " + (msg[1] + 1) : ""}`);
+}).register([67, 16, 76, 2, 1, 66], function (msg) {
+	console.info(`XG variation 1: ${msg}`);
+}).register([67, 16, 76, 2, 1, 68], function (msg) {
+	console.info(`XG variation 2: ${msg}`);
+}).register([67, 16, 76, 2, 1, 70], function (msg) {
+	console.info(`XG variation 3: ${msg}`);
+}).register([67, 16, 76, 2, 1, 72], function (msg) {
+	console.info(`XG variation 4: ${msg}`);
+}).register([67, 16, 76, 2, 1, 74], function (msg) {
+	console.info(`XG variation 5: ${msg}`);
+}).register([67, 16, 76, 2, 1, 76], function (msg) {
+	console.info(`XG variation 6: ${msg}`);
+}).register([67, 16, 76, 2, 1, 78], function (msg) {
+	console.info(`XG variation 7: ${msg}`);
+}).register([67, 16, 76, 2, 1, 80], function (msg) {
+	console.info(`XG variation 8: ${msg}`);
+}).register([67, 16, 76, 2, 1, 82], function (msg) {
+	console.info(`XG variation 9: ${msg}`);
+}).register([67, 16, 76, 2, 1, 84], function (msg) {
+	console.info(`XG variation 10: ${msg}`);
+}).register([67, 16, 76, 2, 1, 86], function (msg) {
+	console.info(`XG variation return: ${getDecibel(msg[0])}dB`);
+}).register([67, 16, 76, 2, 1, 87], function (msg) {
+	console.info(`XG variation pan: ${textedPanning(msg[0])}`);
+}).register([67, 16, 76, 2, 1, 88], function (msg) {
+	console.info(`XG variation to reverb: ${getDecibel(msg[0])}dB`);
+}).register([67, 16, 76, 2, 1, 89], function (msg) {
+	console.info(`XG variation to chorus: ${getDecibel(msg[0])}dB`);
+}).register([67, 16, 76, 2, 1, 90], function (msg) {
+	console.info(`XG variation connection: ${msg[0] ? "system" : "insertion"}`);
+}).register([67, 16, 76, 2, 1, 91], function (msg) {
+	console.info(`XG variation part: ${msg}`);
+}).register([67, 16, 76, 2, 1, 92], function (msg) {
+	console.info(`XG variation mod wheel: ${textedPitchBend(msg[0])}`);
+}).register([67, 16, 76, 2, 1, 93], function (msg) {
+	console.info(`XG variation bend wheel: ${textedPitchBend(msg[0])}`);
+}).register([67, 16, 76, 2, 1, 94], function (msg) {
+	console.info(`XG variation channel after touch: ${msg[0] - 64}`);
+}).register([67, 16, 76, 2, 1, 95], function (msg) {
+	console.info(`XG variation AC1: ${msg[0] - 64}`);
+}).register([67, 16, 76, 2, 1, 96], function (msg) {
+	console.info(`XG variation AC2: ${msg[0] - 64}`);
+}).register([67, 16, 76, 8], function (msg, channel, time) {
+	// XG part setup
+	xgPartConf.run(msg.slice(1), msg[0] + 1, time);
 });
 // Roland MT-32 SysEx
 sysEx.register([65, 1, 22, 18, 2, 0, 0], function (msg) {
@@ -493,6 +726,30 @@ sysEx.register([65, 1, 22, 18, 2, 0, 0], function (msg) {
 	mt32ToneProp(8, msg);
 }).register([65, 9, 22, 18, 2, 0, 0], function (msg) {
 	mt32ToneProp(9, msg);
+});
+// XG Part Setup
+xgPartConf.register([0], function (msg, channel) {
+	console.info(`XG Part reserve ${msg[0]} elements for channel ${channel}.`);
+}).register([7], function (msg, channel) {
+	console.info(`XG Part use mode "${xgPartMode[msg[0]]}" for channel ${channel}.`);
+}).register([14], function (msg, channel) {
+	console.info(`XG Part panning for channel ${channel}: ${textedPanning(msg[0])}.`);
+}).register([17], function (msg, channel) {
+	console.info(`XG Part dry level ${msg[0]} for channel ${channel}.`);
+}).register([21], function (msg, channel) {
+	console.info(`XG Part LFO speed ${msg[0]} for channel ${channel}.`);
+}).register([29], function (msg, channel) {
+	console.info(`XG Part MW bend ${msg[0] - 64} semitones for channel ${channel}.`);
+}).register([32], function (msg, channel) {
+	console.info(`XG Part MW LFO pitch depth ${msg[0]} for channel ${channel}.`);
+}).register([33], function (msg, channel) {
+	console.info(`XG Part MW LFO filter depth ${msg[0]} for channel ${channel}.`);
+}).register([35], function (msg, channel) {
+	console.info(`XG Part bend pitch ${msg[0] - 64} semitones for channel ${channel}.`);
+}).register([105], function (msg, channel) {
+	console.info(`XG Part EG initial ${msg[0] - 64} for channel ${channel}.`);
+}).register([106], function (msg, channel) {
+	console.info(`XG Part EG attack time ${msg[0] - 64} for channel ${channel}.`);
 });
 
 let curFps = 0, lastFrame = Date.now();
@@ -950,9 +1207,9 @@ self.task = setInterval(function () {
 		pressedNotes.forEach(function (e0) {
 			polyphony += e0.length;
 		});
-		registerDisp.innerHTML = `Event:${midiEvents.length.toString().padStart(3, "0")} Poly:${Math.max(polyphony, 0).toString().padStart(3, "0")}(${Math.max(maxPoly, 0).toString().padStart(3, "0")})/${midiModeName[2][midiMode].toString().padStart(3, "0")} TSig:${musicNomin}/${musicDenom} Bar:${(Math.max(0, curBar) + 1).toString().padStart(3, "0")}/${Math.max(0, curBeat) + 1} Tempo:${trailPt(Math.round(musicTempo * 100) / 100)} Vol:${trailPt(masterVol, 1, 1)}%\nMode:${midiModeName[1][midiMode]} Time:${Math.floor(audioPlayer.currentTime / 60).toString().padStart(2,"0")}:${Math.floor(audioPlayer.currentTime % 60).toString().padStart(2,"0")}.${Math.round((audioPlayer.currentTime) % 1 * 1000).toString().padStart(3,"0")} Key:CM${trkName ? " Title:" + trkName : ""}${nearestEvent ? " Ext:" + nearestEvent : ""}\n\nCH:Ch.Voice St BVE RCVTD PPP M PI PAN : NOTE\n`;
+		registerDisp.innerHTML = `Event:${midiEvents.length.toString().padStart(3, "0")} Poly:${Math.max(polyphony, 0).toString().padStart(3, "0")}(${Math.max(maxPoly, 0).toString().padStart(3, "0")})/${midiModeName[2][midiMode].toString().padStart(3, "0")} TSig:${musicNomin}/${musicDenom} Bar:${(Math.max(0, curBar) + 1).toString().padStart(3, "0")}/${Math.max(0, curBeat) + 1} Tempo:${trailPt(Math.round(musicTempo * 100) / 100)} Vol:${trailPt(masterVol, 1, 1)}%\nMode:${midiModeName[1][midiMode]} Time:${Math.floor(audioPlayer.currentTime / 60).toString().padStart(2,"0")}:${Math.floor(audioPlayer.currentTime % 60).toString().padStart(2,"0")}.${Math.round((audioPlayer.currentTime) % 1 * 1000).toString().padStart(3,"0")} Key:CM${trkName ? " Title:" + trkName : ""}${nearestEvent ? " Ext:" + nearestEvent : ""}\n\nCH:Ch.Voice# St BVE RCVTD PPP M PI PAN : NOTE\n`;
 		pressedNotes.forEach(function (e0, i) {
-			registerDisp.innerHTML += `${(i+1).toString().padStart(2, "0")}:${(midiMode == 3 && e0.npg == (e0.prg || 0)) ? e0.nme?.trimEnd() || "NmeUnset" : self.getSoundBank && self.getSoundBank(e0.msb || subMsb, e0.prg, e0.lsb || subLsb).padEnd(8, " ") || "Unknown "} ${getStd(e0.msb || subMsb, e0.prg, e0.lsb || subLsb)} ${map[(e0.bal || 0) >> 1]}${map[(e0.vol || 0) >> 1]}${map[(e0.exp || 0) >> 1]} ${map[(e0.rev || 0) >> 1]}${map[(e0.cho || 0) >> 1]}${map[(e0.var || 0) >> 1]}${map[(e0.tre || 0) >> 1]}${map[(e0.det || 0) >> 1]} ${map[(e0.ped || 0) >> 1]}${(e0.pon >= 64 ? "O" : "X")}${map[(e0.por || 0) >> 1]} ${((e0.mod || 0) >> 6 > 0) ? "|" : ((e0.mod || 0) >> 4 > 0 ? "~" : "-")} ${textedPitchBend(e0.npb || [0, 64])} ${textedPanning(e0.pan == undefined ? 0 : e0.pan)}: `;
+			registerDisp.innerHTML += `${(i+1).toString().padStart(2, "0")}:${(midiMode == 3 && e0.npg == (e0.prg || 0)) ? e0.nme?.trimEnd().slice(0, 8) + "~" || "NmeUnset" : self.getSoundBank && self.getSoundBank(e0.msb || getMsb(midiMode, i) || subMsb, e0.prg, e0.lsb || subLsb).padEnd(9, " ") || "Unknown "} ${getStd(e0.msb || subMsb, e0.prg, e0.lsb || subLsb)} ${map[(e0.bal || 0) >> 1]}${map[(e0.vol || 0) >> 1]}${map[(e0.exp || 0) >> 1]} ${map[(e0.rev || 0) >> 1]}${map[(e0.cho || 0) >> 1]}${map[(e0.var || 0) >> 1]}${map[(e0.tre || 0) >> 1]}${map[(e0.det || 0) >> 1]} ${map[(e0.ped || 0) >> 1]}${(e0.pon >= 64 ? "O" : "X")}${map[(e0.por || 0) >> 1]} ${((e0.mod || 0) >> 6 > 0) ? "|" : ((e0.mod || 0) >> 4 > 0 ? "~" : "-")} ${textedPitchBend(e0.npb || [0, 64])} ${textedPanning(e0.pan == undefined ? 0 : e0.pan)}: `;
 			Array.from(e0).sort(function (a, b) {return Math.sign(a - b)}).forEach(function (e1) {
 				registerDisp.innerHTML += `${noteNames[e1%12]}${Math.floor(e1/12)} `;
 			});
