@@ -2,6 +2,7 @@
 
 let midiBlob, midiBuffer, midiJson, msgPort;
 const map = "0123456789_aAbBcCdDeEfFgGhHiIjJ-kKlLmMnNoOpPqQrRsStTuUvVwWxXyYzZ";
+const noteRegion = "!0123456789";
 
 let xgEffType = [
 	"off",
@@ -457,6 +458,7 @@ audioPlayer.onplaying = function () {
 };
 audioPlayer.onplay = function () {
 	if (this.ended || switchedTrack) {
+		masterVol = 100;
 		textData = "";
 		trkName = "";
 		delete self.pressedNotes;
@@ -1207,11 +1209,11 @@ self.task = setInterval(function () {
 		pressedNotes.forEach(function (e0) {
 			polyphony += e0.length;
 		});
-		registerDisp.innerHTML = `Event:${midiEvents.length.toString().padStart(3, "0")} Poly:${Math.max(polyphony, 0).toString().padStart(3, "0")}(${Math.max(maxPoly, 0).toString().padStart(3, "0")})/${midiModeName[2][midiMode].toString().padStart(3, "0")} TSig:${musicNomin}/${musicDenom} Bar:${(Math.max(0, curBar) + 1).toString().padStart(3, "0")}/${Math.max(0, curBeat) + 1} Tempo:${trailPt(Math.round(musicTempo * 100) / 100)} Vol:${trailPt(masterVol, 1, 1)}%\nMode:${midiModeName[1][midiMode]} Time:${Math.floor(audioPlayer.currentTime / 60).toString().padStart(2,"0")}:${Math.floor(audioPlayer.currentTime % 60).toString().padStart(2,"0")}.${Math.round((audioPlayer.currentTime) % 1 * 1000).toString().padStart(3,"0")} Key:CM${trkName ? " Title:" + trkName : ""}${nearestEvent ? " Ext:" + nearestEvent : ""}\n\nCH:Ch.Voice# St BVE RCVTD PPP M PI PAN : NOTE\n`;
+		registerDisp.innerHTML = `Event:${midiEvents.length.toString().padStart(3, "0")} Poly:${Math.max(polyphony, 0).toString().padStart(3, "0")}(${Math.max(maxPoly, 0).toString().padStart(3, "0")})/${midiModeName[2][midiMode].toString().padStart(3, "0")} TSig:${musicNomin}/${musicDenom} Bar:${(Math.max(0, curBar) + 1).toString().padStart(3, "0")}/${Math.max(0, curBeat) + 1} Tempo:${trailPt(Math.round(musicTempo * 100) / 100)} Vol:${trailPt(masterVol, 1, 1)}%\nMode:${midiModeName[1][midiMode]} Time:${Math.floor(audioPlayer.currentTime / 60).toString().padStart(2,"0")}:${Math.floor(audioPlayer.currentTime % 60).toString().padStart(2,"0")}.${Math.round((audioPlayer.currentTime) % 1 * 1000).toString().padStart(3,"0")} Key:CM${trkName ? " Title:" + trkName : ""}${nearestEvent ? " Ext:" + nearestEvent : ""}\n\nCH:Ch.Voice#St BVE RCVTBD PPP M Pi Pan : Note\n`;
 		pressedNotes.forEach(function (e0, i) {
-			registerDisp.innerHTML += `${(i+1).toString().padStart(2, "0")}:${(midiMode == 3 && e0.npg == (e0.prg || 0)) ? e0.nme?.trimEnd().slice(0, 8) + "~" || "NmeUnset" : self.getSoundBank && self.getSoundBank(e0.msb || getMsb(midiMode, i) || subMsb, e0.prg, e0.lsb || subLsb).padEnd(9, " ") || "Unknown "} ${getStd(e0.msb || subMsb, e0.prg, e0.lsb || subLsb)} ${map[(e0.bal || 0) >> 1]}${map[(e0.vol || 0) >> 1]}${map[(e0.exp || 0) >> 1]} ${map[(e0.rev || 0) >> 1]}${map[(e0.cho || 0) >> 1]}${map[(e0.var || 0) >> 1]}${map[(e0.tre || 0) >> 1]}${map[(e0.det || 0) >> 1]} ${map[(e0.ped || 0) >> 1]}${(e0.pon >= 64 ? "O" : "X")}${map[(e0.por || 0) >> 1]} ${((e0.mod || 0) >> 6 > 0) ? "|" : ((e0.mod || 0) >> 4 > 0 ? "~" : "-")} ${textedPitchBend(e0.npb || [0, 64])} ${textedPanning(e0.pan == undefined ? 0 : e0.pan)}: `;
+			registerDisp.innerHTML += `${(i+1).toString().padStart(2, "0")}:${(midiMode == 3 && e0.npg == (e0.prg || 0)) ? e0.nme?.trimEnd().slice(0, 8) + "~" || "NmeUnset" : self.getSoundBank && self.getSoundBank(e0.msb || getMsb(midiMode, i) || subMsb, e0.prg, e0.lsb || subLsb).padEnd(9, " ") || "Unknown "}${getStd(e0.msb || subMsb, e0.prg, e0.lsb || subLsb)} ${map[(e0.bal || 0) >> 1]}${map[(e0.vol || 0) >> 1]}${map[(e0.exp || 0) >> 1]} ${map[(e0.rev || 0) >> 1]}${map[(e0.cho || 0) >> 1]}${map[(e0.var || 0) >> 1]}${map[(e0.tre || 0) >> 1]}${map[(e0.brt > -1 ? e0.brt : 127) >> 1]}${map[(e0.det || 0) >> 1]} ${map[(e0.ped || 0) >> 1]}${(e0.pon >= 64 ? "O" : "X")}${map[(e0.por || 0) >> 1]} ${((e0.mod || 0) >> 6 > 0) ? "|" : ((e0.mod || 0) >> 4 > 0 ? "~" : "-")} ${textedPitchBend(e0.npb || [0, 64])} ${textedPanning(e0.pan == undefined ? 0 : e0.pan)}: `;
 			Array.from(e0).sort(function (a, b) {return Math.sign(a - b)}).forEach(function (e1) {
-				registerDisp.innerHTML += `${noteNames[e1%12]}${Math.floor(e1/12)} `;
+				registerDisp.innerHTML += `${noteNames[e1%12]}${noteRegion[Math.floor(e1/12)]} `;
 			});
 			registerDisp.innerHTML += `\n`;
 		});
