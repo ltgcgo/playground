@@ -3,31 +3,31 @@
 MidiParser.customInterpreter = function (type, file, rawMtLen) {
 	// THIS MAY OR MAY NOT WORK PROPERLY!
 	let u8Data = [];
-	if (rawMtLen != null) {
-		let metaLength = file.readIntVLV();
-		if (type == 127) {
-			metaLength = 1;
+	let metaLength = rawMtLen;
+	if (rawMtLen == false) {
+		metaLength = file.readIntVLV();
+	};
+	if (type == 127) {
+		metaLength = 1;
+	};
+	for (let c = 0; c < metaLength; c ++) {
+		let byte = file.readInt(1);
+		u8Data.push(byte);
+		if (byte == 247) {
+			console.info(rawMtLen);
+			return u8Data;
+		} else if (byte > 127) {
+			//u8Data.pop();
+			console.debug(`Early termination: ${u8Data}`);
+			file.backOne();
+			file.backOne();
+			return u8Data;
 		};
-		for (let c = 0; c < metaLength; c ++) {
-			let byte = file.readInt(1);
-			u8Data.push(byte);
-			if (byte == 247) {
-				return u8Data;
-			} else if (byte > 127) {
-				console.debug(`Early termination: ${u8Data}`);
-				file.backOne();
-				file.backOne();
-				//file.backOne();
-				//file.backOne();
-				return u8Data;
-				//console.debug(`Start of another SysEx! ${u8Data}`);
-				//u8Data.push(byte);
-			};
-		};
-	} else {
+	};
+	/*} else {
 		file.readInt(rawMtLen);
 		u8Data[0] = file.readInt(rawMtLen);
-	};
+	};*/
 	return u8Data;
 };
 
