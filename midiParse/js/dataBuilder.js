@@ -1,14 +1,32 @@
 "use strict";
 
-MidiParser.customInterpreter = function (type, file) {
+MidiParser.customInterpreter = function (type, file, rawMtLen) {
 	// THIS MAY OR MAY NOT WORK PROPERLY!
-	let metaLength = file.readIntVLV();
-	if (type == 127) {
-		metaLength = 1;
-	};
 	let u8Data = [];
-	for (let c = 0; c < metaLength; c ++) {
-		u8Data.push(file.readInt(1));
+	if (rawMtLen != null) {
+		let metaLength = file.readIntVLV();
+		if (type == 127) {
+			metaLength = 1;
+		};
+		for (let c = 0; c < metaLength; c ++) {
+			let byte = file.readInt(1);
+			u8Data.push(byte);
+			if (byte == 247) {
+				return u8Data;
+			} else if (byte > 127) {
+				console.debug(`Early termination: ${u8Data}`);
+				file.backOne();
+				file.backOne();
+				//file.backOne();
+				//file.backOne();
+				return u8Data;
+				//console.debug(`Start of another SysEx! ${u8Data}`);
+				//u8Data.push(byte);
+			};
+		};
+	} else {
+		file.readInt(rawMtLen);
+		u8Data[0] = file.readInt(rawMtLen);
 	};
 	return u8Data;
 };
@@ -131,7 +149,7 @@ self.MidiEventPool = class {
 						track[targetChannel] = new TimedEvents();
 						track[targetChannel].name = `MIDI Channel ${targetChannel}`;
 					};
-					let appendObj = {type: e1.type, data: e1.data};
+					let appendObj = {type: e1.type, data: e1.data, track: i0};
 					if (e1.type == 255) {
 						appendObj.meta = e1.metaType;
 					} else {

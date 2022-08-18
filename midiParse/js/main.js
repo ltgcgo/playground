@@ -766,6 +766,7 @@ self.task = setInterval(function () {
 			let e = f.data;
 			switch (e.type) {
 				case 255: {
+					console.debug(e.meta, e.data);
 					switch (e.meta) {
 						case 88: {
 							// Time signature
@@ -806,7 +807,7 @@ self.task = setInterval(function () {
 							break;
 						};
 						case 33: {
-							// I don't know what it does, really. Just that the Monkey Island MIDI file appeared this.
+							// I don't know what it does, really. This appeared in the Monkey Island MIDI file.
 							/*if (midiMode != 3) {
 								textData += `\nRoland MT-32 detected via meta events.`;
 							};
