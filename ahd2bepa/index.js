@@ -12,6 +12,13 @@ o͝o;ʊ
 o͞o;uː
 ōō;uː
 ou;aʊ
+ch;tʃ
+ᴋʜ;x
+ng;ŋ
+sh;ʃ
+th;θ
+t͟h;ð
+zh;ʒ
 ə;ʌ
 ər;ə
 ä;ɑː
@@ -30,7 +37,11 @@ a;æ
 e;ɛ
 i;ɪ
 o;ɒ
-ʌr;ə`;
+ʌr;ə
+ʍ;hw
+j;dʒ
+y;j
+ü;y`;
 dictText.split("\n").forEach((e) => {
 	let line = e.split(";");
 	dict[line[0]] = [line[1]];
