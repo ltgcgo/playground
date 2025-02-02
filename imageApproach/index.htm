@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<head>
+	<meta charset="utf-8" http-equiv="200" />
+	<title>Image auto selection test</title>
+	<meta content="true" name="HandheldFriendly" />
+	<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" name="viewport" />
+</head>
+<body>
+	<picture class="approach-srcset">
+		<source srcset="./sizeTest.webp, ./sizeTest@1.5.webp 1.5x, ./sizeTest@2.webp 2x, ./sizeTest@3.webp 3x" />
+		<img />
+	</picture>
+	<br/>
+	<picture class="approach-media">
+		<source srcset="./sizeTest@3.webp" media="(min-resolution: 3dppx)" />
+		<source srcset="./sizeTest@2.webp" media="(min-resolution: 2dppx)" />
+		<source srcset="./sizeTest@1.5.webp" media="(min-resolution: 1.5dppx)" />
+		<source srcset="./sizeTest.webp" />
+		<img />
+	</picture>
+</body>
