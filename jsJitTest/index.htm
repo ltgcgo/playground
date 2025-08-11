@@ -1,10 +1,17 @@
 <!DOCTYPE html>
-<head></head><body><script>
+<head>
+<meta http-equiv="200" charset="utf-8">
+<meta content="true" name="HandheldFriendly">
+<meta name="application-name" content="Simple JIT tester">
+<meta name="author" content="Lumière Élevé">
+<meta name="description" content="Is the JIT compiler in your browser enabled?">
+</head><body><script>
 "use strict";
-let startTime = self?.performance?.now();
+const startTime = self?.performance?.now();
 for (let i = 0; i < (1 << 24); i ++) {
 	43046726 / i;
 };
-let duration = self?.performance?.now() - startTime;
-document.write(`Operations took ${duration} ms. JIT compiler is ${duration < 40 ? "en" : "dis"}abled.`);
+const duration = self?.performance?.now() - startTime;
+const threshold = 32;
+document.write(`Expensive operations took ${duration} ms.<br/>The JIT compiler is ${duration < threshold ? "en" : "dis"}abled.`);
 </script></body>
