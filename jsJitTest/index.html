@@ -1,0 +1,10 @@
+<!DOCTYPE html>
+<head></head><body><script>
+"use strict";
+let startTime = self?.performance?.now();
+for (let i = 0; i < (1 << 24); i ++) {
+	43046726 / i;
+};
+let duration = self?.performance?.now() - startTime;
+document.write(`Operations took ${duration} ms. JIT compiler is ${duration < 40 ? "en" : "dis"}abled.`);
+</script></body>
